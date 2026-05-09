@@ -90,12 +90,7 @@ const DOC_CFG: Record<string, { color: string; bg: string; label: string; short:
   CORRIGENDUM: { color: T.cor,  bg: "#fff7ed",   label: "Corrigendum", short: "COR", icon: "🔧" },
 };
 
-const MOCK_CHANGES = [
-  { id:"c1", reg:17,  doc_type:"AMENDMENT",   change_type:"NUEVO_DOCUMENTO", title:"UN R17 Rev.7 — Amendment 2 (11 series)", url:"#", timestamp:"2025-05-07T09:12:00", has_pdf:true, has_prev:true,  summary:"Modifica §5.8.4 — nuevo límite de desplazamiento de apoyacabezas bajo carga dinámica (25 mm). Añade disposiciones transitorias §13.14 hasta 2028." },
-  { id:"c2", reg:48,  doc_type:"CORRIGENDUM", change_type:"NUEVO_DOCUMENTO", title:"UN R48 Rev.7 — Corrigendum 1",            url:"#", timestamp:"2025-04-22T08:00:00", has_pdf:true, has_prev:false, summary:"Corrección técnica en Annex 5, tabla de ángulos de inclinación para luces traseras en vehículos N3." },
-  { id:"c3", reg:155, doc_type:"AMENDMENT",   change_type:"NUEVO_DOCUMENTO", title:"UN R155 Rev.1 — Amendment 1",             url:"#", timestamp:"2025-02-14T11:30:00", has_pdf:true, has_prev:true,  summary:"Actualización de requisitos CSMS para vehículos conectados. Nuevas categorías de activos de software en Annex 5." },
-  { id:"c4", reg:100, doc_type:"REVISION",    change_type:"NUEVO_DOCUMENTO", title:"UN R100 Rev.3 — Consolidated text",       url:"#", timestamp:"2025-01-09T07:45:00", has_pdf:true, has_prev:true,  summary:"Nueva revisión consolidada que incorpora enmiendas 1 y 2 del Rev.2. Cambios significativos en capítulos 6 y 7 sobre baterías de tracción." },
-];
+const MOCK_CHANGES: Change[] = [];
 
 interface Change {
   id: string;
