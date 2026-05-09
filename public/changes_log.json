@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "id": "c1",
+    "reg": 17,
+    "doc_type": "AMENDMENT",
+    "change_type": "NUEVO_DOCUMENTO",
+    "title": "UN R17 Rev.7 — Amendment 2 (11 series)",
+    "timestamp": "2025-05-07T09:12:00",
+    "has_pdf": true,
+    "has_prev": true,
+    "summary": "Modifica §5.8.4 — nuevo límite de desplazamiento de apoyacabezas bajo carga dinámica (25 mm). Añade disposiciones transitorias §13.14 hasta 2028."
+  }
+]
