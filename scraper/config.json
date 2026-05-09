@@ -1,0 +1,7 @@
+{
+  "regulations": [17, 48, 100, 155],
+  "email": {
+    "enabled": false,
+    "to": []
+  }
+}

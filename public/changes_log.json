@@ -1,0 +1,24 @@
+[
+  {
+    "id": "c1",
+    "reg": 17,
+    "doc_type": "AMENDMENT",
+    "change_type": "NUEVO_DOCUMENTO",
+    "title": "UN R17 Rev.7 — Amendment 2",
+    "timestamp": "2025-05-07T09:12:00",
+    "has_pdf": true,
+    "has_prev": true,
+    "summary": "Modifica §5.8.4 — nuevo límite de desplazamiento de apoyacabezas bajo carga dinámica (25 mm)."
+  },
+  {
+    "id": "c2",
+    "reg": 48,
+    "doc_type": "CORRIGENDUM",
+    "change_type": "NUEVO_DOCUMENTO",
+    "title": "UN R48 Rev.7 — Corrigendum 1",
+    "timestamp": "2025-04-22T08:00:00",
+    "has_pdf": true,
+    "has_prev": false,
+    "summary": "Corrección técnica en Annex 5, tabla de ángulos de inclinación para luces traseras N3."
+  }
+]

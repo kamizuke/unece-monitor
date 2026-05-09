@@ -1,0 +1,70 @@
+name: UNECE Regulations Monitor
+
+on:
+  schedule:
+    # 07:00 UTC = 09:00 Madrid (CEST)
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: "Force run even if no changes expected"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: scraper/requirements.txt
+
+      - name: Install Python dependencies
+        run: pip install -r scraper/requirements.txt
+
+      - name: Install Playwright Chromium
+        run: playwright install chromium --with-deps
+
+      - name: Run UNECE scraper
+        id: scraper
+        run: |
+          python scraper/monitor.py
+          echo "new_changes=$(python -c "import json,pathlib; log=json.loads(pathlib.Path('public/changes_log.json').read_text()); print(len([x for x in log[:5] if 'Nuevo documento' in x.get('summary','') or x.get('change_type')=='NUEVO_DOCUMENTO']))")" >> $GITHUB_OUTPUT
+
+      - name: Run AI analysis (if changes detected)
+        if: steps.scraper.outputs.new_changes != '0'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scraper/comparator.py
+
+      - name: Send email notifications (if changes detected)
+        if: steps.scraper.outputs.new_changes != '0'
+        env:
+          EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        run: python scraper/notifier.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "UNECE Monitor Bot"
+          git config user.email "bot@unece-monitor.noreply"
+          git add public/changes_log.json public/state.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: update changes_log and state [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+            git push
+          fi
