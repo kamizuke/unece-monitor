@@ -285,10 +285,40 @@ export default function UneceApp() {
         ::-webkit-scrollbar-thumb{background:${T.border2};border-radius:3px}
         button:hover{filter:brightness(.96)}
         input:focus{outline:none!important;border-color:${T.blue}!important;box-shadow:0 0 0 3px ${T.blue}20!important}
+
+        /* ── RESPONSIVE ── */
+        .app-header{padding:0 16px!important;height:auto!important;min-height:56px;flex-wrap:wrap;gap:10px;padding-top:10px!important;padding-bottom:10px!important}
+        .header-logo-subtitle{display:block}
+        .header-right{gap:10px!important;flex-wrap:wrap;justify-content:flex-end}
+        .header-last-check{display:block}
+        .app-nav{padding:0 8px!important;overflow-x:auto;-webkit-overflow-scrolling:touch}
+        .app-nav button{padding:10px 12px!important;font-size:12px!important;white-space:nowrap}
+        .app-content{padding:16px!important}
+        .dashboard-grid{display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start}
+        .change-card-inner{display:flex}
+        .change-card-action{display:flex;align-items:center;padding:0 16px;border-left:1px solid ${T.border};background:${T.bg}}
+
+        @media(max-width:900px){
+          .dashboard-grid{grid-template-columns:1fr!important}
+          .sidebar{order:99}
+        }
+        @media(max-width:640px){
+          .app-header{padding:10px 14px!important}
+          .header-logo-subtitle{display:none!important}
+          .header-last-check{display:none!important}
+          .app-content{padding:12px 14px!important}
+          .change-card-inner{flex-direction:column!important}
+          .change-card-action{border-left:none!important;border-top:1px solid ${T.border}!important;padding:10px 14px!important;justify-content:flex-end}
+          .reg-grid{grid-template-columns:1fr 1fr!important}
+          .selector-grid{grid-template-columns:1fr!important}
+        }
+        @media(max-width:400px){
+          .reg-grid{grid-template-columns:1fr!important}
+        }
       `}</style>
 
       {/* ── HEADER ────────────────────────────────────────────────────────── */}
-      <header style={{ background:T.blueDeep, color:"white", padding:"0 28px", display:"flex", alignItems:"center", gap:0, height:56, flexShrink:0, boxShadow:"0 2px 8px rgba(0,61,107,.25)" }}>
+      <header className="app-header" style={{ background:T.blueDeep, color:"white", padding:"0 28px", display:"flex", alignItems:"center", gap:0, height:56, flexShrink:0, boxShadow:"0 2px 8px rgba(0,61,107,.25)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:14 }}>
           <div style={{ width:34, height:34, borderRadius:6, background:"rgba(255,255,255,.12)", border:"1px solid rgba(255,255,255,.2)", display:"flex", alignItems:"center", justifyContent:"center" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -299,13 +329,13 @@ export default function UneceApp() {
           </div>
           <div>
             <div style={{ fontSize:13, fontWeight:700, letterSpacing:"0.02em", opacity:.95 }}>UNECE Regulatory Monitor</div>
-            <div style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>Sistema de vigilancia de reglamentos de homologación</div>
+            <div className="header-logo-subtitle" style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>Sistema de vigilancia de reglamentos de homologación</div>
           </div>
         </div>
 
-        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:16 }}>
+        <div className="header-right" style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:16 }}>
           {/* Última revisión */}
-          <div style={{ textAlign:"right" as const }}>
+          <div className="header-last-check" style={{ textAlign:"right" as const }}>
             <div style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>ÚLTIMA REVISIÓN</div>
             <div style={{ fontFamily:T.mono, fontSize:11, opacity:.85 }}>
               {lastCheck
@@ -362,7 +392,7 @@ export default function UneceApp() {
       </header>
 
       {/* ── SUBHEADER NAV ────────────────────────────────────────────────── */}
-      <div style={{ background:"white", borderBottom:`2px solid ${T.border}`, display:"flex", padding:"0 28px", gap:0 }}>
+      <div className="app-nav" style={{ background:"white", borderBottom:`2px solid ${T.border}`, display:"flex", padding:"0 28px", gap:0 }}>
         {[["dashboard","Dashboard"],["selector",`Reglamentos (${ALL_REGS.length})`],["analysis","Análisis IA"]].map(([id, label]) => (
           <button key={id} onClick={() => setView(id!)} style={{
             padding:"12px 20px", border:"none", background:"transparent", cursor:"pointer",
@@ -375,11 +405,11 @@ export default function UneceApp() {
       </div>
 
       {/* ── CONTENT ──────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth:1200, margin:"0 auto", padding:"24px 28px" }}>
+      <div className="app-content" style={{ maxWidth:1200, margin:"0 auto", padding:"24px 28px" }}>
 
         {/* ════ DASHBOARD ════════════════════════════════════════════════ */}
         {view === "dashboard" && (
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:24, alignItems:"start" }}>
+          <div className="dashboard-grid" style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:24, alignItems:"start" }}>
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
 
               {/* Monitored regs grid */}
@@ -387,7 +417,7 @@ export default function UneceApp() {
                 <h2 style={{ fontFamily:T.sans, fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.1em", textTransform:"uppercase" as const, margin:"0 0 12px" }}>
                   Reglamentos monitorizados
                 </h2>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:8 }}>
+                <div className="reg-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))", gap:8 }}>
                   {[...monitored].sort((a, b) => a - b).map(n => {
                     const reg = ALL_REGS.find(r => r.n === n);
                     const hasChange = monChanges.some(c => c.reg === n);
@@ -441,7 +471,7 @@ export default function UneceApp() {
                     {monChanges.map(c => {
                       const cfg = DOC_CFG[c.doc_type] || {};
                       return (
-                        <div key={c.id} style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:6, overflow:"hidden", display:"flex", boxShadow:"0 1px 3px rgba(0,0,0,.04)", animation:"fadeUp .3s ease" }}>
+                        <div key={c.id} className="change-card-inner" style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:6, overflow:"hidden", display:"flex", boxShadow:"0 1px 3px rgba(0,0,0,.04)", animation:"fadeUp .3s ease" }}>
                           <div style={{ width:5, background:cfg.color || T.blue, flexShrink:0 }} />
                           <div style={{ flex:1, padding:"14px 18px" }}>
                             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
@@ -456,7 +486,7 @@ export default function UneceApp() {
                               {c.has_prev && <span style={{ fontFamily:T.mono, fontSize:9, color:"#7c3aed", border:"1px solid #ddd6fe", background:"#faf5ff", padding:"2px 7px", borderRadius:3 }}>◈ Versión anterior disponible</span>}
                             </div>
                           </div>
-                          <div style={{ display:"flex", alignItems:"center", padding:"0 16px", borderLeft:`1px solid ${T.border}`, background:T.bg }}>
+                          <div className="change-card-action" style={{ display:"flex", alignItems:"center", padding:"0 16px", borderLeft:`1px solid ${T.border}`, background:T.bg }}>
                             <button onClick={() => requestAnalysis(c)} style={{
                               background:T.blue, color:"white", border:"none", borderRadius:5,
                               padding:"9px 16px", fontSize:12, fontWeight:600, cursor:"pointer",
@@ -472,7 +502,7 @@ export default function UneceApp() {
             </div>
 
             {/* RIGHT sidebar */}
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <div className="sidebar" style={{ display:"flex", flexDirection:"column", gap:12 }}>
               {[
                 { label:"Reglamentos vigilados", value:monitored.size,                                                         color:T.blueDeep },
                 { label:"Cambios detectados",    value:monChanges.length,                                                      color:monChanges.length > 0 ? T.cor : T.ok },
@@ -531,7 +561,7 @@ export default function UneceApp() {
               </div>
             </div>
 
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))", gap:6 }}>
+            <div className="selector-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))", gap:6 }}>
               {filtered.map(r => {
                 const isOn = monitored.has(r.n);
                 const hasChange = allChanges.some(c => c.reg === r.n);
