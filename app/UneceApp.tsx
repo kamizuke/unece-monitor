@@ -205,6 +205,9 @@ export default function UneceApp() {
   const [aiReport, setAiReport]             = useState("");
   const [allChanges, setAllChanges]         = useState<Change[]>(MOCK_CHANGES);
   const [loadingData, setLoadingData]       = useState(true);
+  const [lastCheck, setLastCheck]           = useState<string | null>(null);
+  const [triggering, setTriggering]         = useState(false);
+  const [triggerMsg, setTriggerMsg]         = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/changes_log.json?_=" + Date.now())
@@ -214,7 +217,28 @@ export default function UneceApp() {
       })
       .catch(() => {/* keep mock data */})
       .finally(() => setLoadingData(false));
+
+    fetch("/state.json?_=" + Date.now())
+      .then(r => r.json())
+      .then((s: { last_check?: string }) => { if (s.last_check) setLastCheck(s.last_check); })
+      .catch(() => {});
   }, []);
+
+  async function triggerScraper() {
+    setTriggering(true);
+    setTriggerMsg(null);
+    try {
+      const res = await fetch("/api/trigger", { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error desconocido");
+      setTriggerMsg("✓ Scraping iniciado — los resultados aparecerán en ~2 min");
+    } catch (e: unknown) {
+      setTriggerMsg(`✗ ${e instanceof Error ? e.message : "Error al lanzar el scraper"}`);
+    } finally {
+      setTriggering(false);
+      setTimeout(() => setTriggerMsg(null), 6000);
+    }
+  }
 
   const toggleReg = (n: number) => setMonitored(prev => {
     const s = new Set(prev); s.has(n) ? s.delete(n) : s.add(n); return s;
@@ -284,11 +308,51 @@ export default function UneceApp() {
           </div>
         </div>
 
-        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:20 }}>
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:16 }}>
+          {/* Última revisión */}
           <div style={{ textAlign:"right" as const }}>
-            <div style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>ÚLTIMO CHECK</div>
-            <div style={{ fontFamily:T.mono, fontSize:11, opacity:.85 }}>{now}</div>
+            <div style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>ÚLTIMA REVISIÓN</div>
+            <div style={{ fontFamily:T.mono, fontSize:11, opacity:.85 }}>
+              {lastCheck
+                ? new Date(lastCheck).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" })
+                : "—"}
+            </div>
           </div>
+
+          {/* Botón ejecutar scraping */}
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+            <button
+              onClick={triggerScraper}
+              disabled={triggering}
+              style={{
+                background: triggering ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.15)",
+                border:"1px solid rgba(255,255,255,.3)",
+                color:"white", borderRadius:6, padding:"6px 14px",
+                fontSize:11, fontWeight:600, cursor: triggering ? "not-allowed" : "pointer",
+                fontFamily:T.sans, letterSpacing:"0.04em", whiteSpace:"nowrap" as const,
+                display:"flex", alignItems:"center", gap:6, transition:"all .2s",
+              }}
+            >
+              {triggering ? (
+                <><span style={{ display:"inline-block", animation:"spin 1s linear infinite" }}>↻</span> Lanzando…</>
+              ) : (
+                <>▶ Ejecutar ahora</>
+              )}
+            </button>
+            {triggerMsg && (
+              <div style={{
+                position:"absolute", marginTop:52,
+                fontSize:11, fontWeight:500, padding:"4px 10px", borderRadius:4,
+                background: triggerMsg.startsWith("✓") ? T.okBg : T.warnBg,
+                color: triggerMsg.startsWith("✓") ? T.ok : T.warn,
+                border:`1px solid ${triggerMsg.startsWith("✓") ? "#bbf7d0" : "#fde68a"}`,
+                whiteSpace:"nowrap" as const, zIndex:50,
+              }}>
+                {triggerMsg}
+              </div>
+            )}
+          </div>
+
           <div style={{ background:"rgba(255,255,255,.1)", border:"1px solid rgba(255,255,255,.2)", borderRadius:6, padding:"6px 14px", textAlign:"center" as const }}>
             <div style={{ fontFamily:T.mono, fontWeight:700, fontSize:18, lineHeight:1 }}>{monitored.size}</div>
             <div style={{ fontSize:9, opacity:.6, letterSpacing:"0.06em", marginTop:2 }}>VIGILANDO</div>
