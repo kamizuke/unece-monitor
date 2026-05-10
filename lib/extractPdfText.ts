@@ -134,18 +134,27 @@ async function decompress(latin1Content: string): Promise<string | null> {
 
   for (const fmt of formats) {
     try {
-      const ds     = new DecompressionStream(fmt);
-      const writer = ds.writable.getWriter();
-      const reader = ds.readable.getReader();
-      await writer.write(buf as unknown as Uint8Array<ArrayBuffer>);
-      await writer.close();
+      const ds = new DecompressionStream(fmt);
+
+      // Write and read concurrently — writing alone can deadlock if the
+      // decompressed output fills the internal buffer before we start reading.
+      const writePromise = (async () => {
+        const writer = ds.writable.getWriter();
+        await writer.write(buf as unknown as Uint8Array<ArrayBuffer>);
+        await writer.close();
+      })();
 
       const chunks: Uint8Array<ArrayBuffer>[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value as Uint8Array<ArrayBuffer>);
-      }
+      const reader = ds.readable.getReader();
+      const readPromise = (async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value as Uint8Array<ArrayBuffer>);
+        }
+      })();
+
+      await Promise.all([writePromise, readPromise]);
 
       const total = chunks.reduce((s, c) => s + c.length, 0);
       const out   = new Uint8Array(total);
