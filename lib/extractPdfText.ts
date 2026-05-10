@@ -10,7 +10,7 @@ export async function extractPdfText(file: File): Promise<{ text: string; pageCo
   const bytes  = new Uint8Array(buffer);
 
   // Decode as latin-1 to preserve byte values intact
-  const raw = new TextDecoder("latin-1").decode(bytes);
+  const raw = new TextDecoder("latin1").decode(bytes);
 
   const text      = parsePdfText(raw);
   const pageCount = countPages(raw);
