@@ -12,10 +12,8 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
-    "pdfjs-dist": "^5.7.284",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "unpdf": "^1.6.2"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
