@@ -1519,23 +1519,27 @@ export default function UneceApp() {
                         </>
                       )}
 
-                      {/* Raw reference strings */}
-                      {scope.extractedReferences.length > 0 && (
-                        <>
-                          <div style={{ fontSize:10, fontWeight:700, color:T.dim, letterSpacing:"0.07em", textTransform:"uppercase" as const, marginBottom:6 }}>
-                            Texto literal en el documento
-                          </div>
-                          <div style={{ display:"flex", flexWrap:"wrap" as const, gap:5 }}>
-                            {scope.extractedReferences.map((ref, i) => (
-                              <span key={i} style={{
-                                fontFamily:T.mono, fontSize:10, padding:"2px 8px",
-                                background:T.bg, color:T.muted,
-                                border:`1px solid ${T.border}`, borderRadius:4,
-                              }}>{ref}</span>
-                            ))}
-                          </div>
-                        </>
-                      )}
+                      {/* Unresolved references — only show strings that don't map to any reg number */}
+                      {(() => {
+                        const unresolved = scope.extractedReferences.filter(ref => extractRegNums(ref).size === 0);
+                        if (unresolved.length === 0) return null;
+                        return (
+                          <>
+                            <div style={{ fontSize:10, fontWeight:700, color:T.dim, letterSpacing:"0.07em", textTransform:"uppercase" as const, marginBottom:6 }}>
+                              Otras referencias normativas
+                            </div>
+                            <div style={{ display:"flex", flexWrap:"wrap" as const, gap:5 }}>
+                              {unresolved.map((ref, i) => (
+                                <span key={i} style={{
+                                  fontFamily:T.mono, fontSize:10, padding:"2px 8px",
+                                  background:T.bg, color:T.muted,
+                                  border:`1px solid ${T.border}`, borderRadius:4,
+                                }}>{ref}</span>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
 
                       {scopeNums.some(n => !ALL_REGS.find(r => r.n === n)) && (
                         <div style={{ fontSize:10, color:T.dim, marginTop:10 }}>
