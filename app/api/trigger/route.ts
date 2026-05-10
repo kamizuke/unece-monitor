@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { githubToken, requireAdmin } from "@/lib/serverAuth";
+import { NextResponse } from "next/server";
+import { githubToken } from "@/lib/serverAuth";
 
 export const runtime = "edge";
 
-export async function POST(req: NextRequest) {
-  const unauthorized = requireAdmin(req);
-  if (unauthorized) return unauthorized;
-
+export async function POST() {
   const token = githubToken();
   if (!token) {
     return NextResponse.json(

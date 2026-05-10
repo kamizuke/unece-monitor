@@ -610,7 +610,7 @@ export default function UneceApp() {
     setTriggering(true);
     setTriggerMsg(null);
     try {
-      const res = await fetchWithAdminAuth("/api/trigger", { method: "POST" });
+      const res = await fetch("/api/trigger", { method: "POST" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error desconocido");
       setLastCheck(new Date().toISOString());
