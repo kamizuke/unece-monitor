@@ -15,7 +15,21 @@ permissions:
   contents: write
 
 jobs:
+  check-config:
+    runs-on: ubuntu-22.04
+    outputs:
+      autorun: ${{ steps.cfg.outputs.autorun }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: cfg
+        run: |
+          autorun=$(python3 -c "import json; print(str(json.load(open('public/config.json')).get('autorun', True)).lower())")
+          echo "autorun=$autorun" >> $GITHUB_OUTPUT
+          echo "autorun=$autorun"
+
   monitor:
+    needs: check-config
+    if: needs.check-config.outputs.autorun == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
 

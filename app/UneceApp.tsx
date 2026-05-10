@@ -350,6 +350,10 @@ export default function UneceApp() {
   const [importingJson, setImportingJson]   = useState(false);
   const jsonImportRef                       = useRef<HTMLInputElement>(null);
 
+  // ── Autorun toggle state ──────────────────────────────────────────────────
+  const [autorun, setAutorun]           = useState<boolean | null>(null); // null = loading
+  const [autorunSaving, setAutorunSaving] = useState(false);
+
   // ── Accreditation scope state ─────────────────────────────────────────────
   const [scope, setScope]               = useState<AccreditationScope | null>(null);
   const [scopeUploading, setScopeUploading] = useState(false);
@@ -372,6 +376,12 @@ export default function UneceApp() {
       .then((s: { last_check?: string }) => { if (s.last_check) setLastCheck(s.last_check); })
       .catch(() => {});
 
+    // Load autorun flag from config.json
+    fetch("/config.json?_=" + Date.now())
+      .then(r => r.json())
+      .then((cfg: { autorun?: boolean }) => setAutorun(cfg.autorun !== false))
+      .catch(() => setAutorun(true));
+
     // Load persisted scope from localStorage
     try {
       const stored = localStorage.getItem(SCOPE_STORAGE_KEY);
@@ -384,6 +394,23 @@ export default function UneceApp() {
     // Load reviewer name from localStorage
     setReviewerName(loadReviewerName());
   }, []);
+
+  // ── Autorun toggle ────────────────────────────────────────────────────────
+  async function toggleAutorun() {
+    if (autorunSaving || autorun === null) return;
+    const next = !autorun;
+    setAutorunSaving(true);
+    try {
+      const res = await fetch("/api/toggle-auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autorun: next }),
+      });
+      if (res.ok) setAutorun(next);
+    } finally {
+      setAutorunSaving(false);
+    }
+  }
 
   // ── PDF Upload ────────────────────────────────────────────────────────────
   async function handlePdfUpload(file: File) {
@@ -928,10 +955,28 @@ export default function UneceApp() {
                 ))}
               </div>
 
-              <div style={{ background:T.blueLight, border:`1px solid ${T.blue}30`, borderRadius:6, padding:16 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:T.blueDeep, letterSpacing:"0.08em", textTransform:"uppercase" as const, marginBottom:8 }}>Próxima ejecución</div>
-                <div style={{ fontFamily:T.mono, fontSize:14, color:T.blueDeep, fontWeight:700 }}>Mañana 09:00 CET</div>
-                <div style={{ fontSize:11.5, color:T.blueMid, marginTop:4 }}>GitHub Actions · cron diario automático</div>
+              <div style={{ background: autorun === false ? "#fef9ec" : T.blueLight, border:`1px solid ${autorun === false ? "#fde68a" : T.blue + "30"}`, borderRadius:6, padding:16 }}>
+                <div style={{ fontSize:11, fontWeight:700, color: autorun === false ? "#92400e" : T.blueDeep, letterSpacing:"0.08em", textTransform:"uppercase" as const, marginBottom:8 }}>Ejecución automática</div>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                  <div>
+                    <div style={{ fontFamily:T.mono, fontSize:12, color: autorun === false ? "#92400e" : T.blueDeep, fontWeight:700 }}>
+                      {autorun === null ? "Cargando…" : autorun ? "Mañana 09:00 CET" : "⏸ Pausada"}
+                    </div>
+                    <div style={{ fontSize:11, color: autorun === false ? "#b45309" : T.blueMid, marginTop:3 }}>GitHub Actions · cron diario</div>
+                  </div>
+                  <button
+                    onClick={toggleAutorun}
+                    disabled={autorunSaving || autorun === null}
+                    style={{
+                      padding:"5px 12px", borderRadius:5, fontSize:11, fontWeight:700, cursor: autorunSaving || autorun === null ? "not-allowed" : "pointer",
+                      border:"none", transition:"background .2s",
+                      background: autorun ? "#dc2626" : "#16a34a",
+                      color:"white", opacity: autorunSaving || autorun === null ? .6 : 1,
+                    }}
+                  >
+                    {autorunSaving ? "…" : autorun ? "Pausar" : "Activar"}
+                  </button>
+                </div>
               </div>
 
               {/* Scope summary in sidebar */}
