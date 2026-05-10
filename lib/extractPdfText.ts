@@ -1,6 +1,6 @@
 "use client";
 
-const MAX_STREAMS   = 60;   // never process more than 60 streams per PDF
+const MAX_STREAMS   = 200;  // never process more than 200 streams per PDF
 const TIMEOUT_MS    = 15_000; // give up after 15 s
 
 export async function extractPdfText(file: File): Promise<{ text: string; pageCount: number }> {
