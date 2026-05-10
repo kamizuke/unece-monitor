@@ -30,6 +30,8 @@ const REF_PATTERNS: RegExp[] = [
   /\bUN\s+R\.?\s*(\d{1,3})\b/gi,
   /\bR\.?\s*(\d{1,3})\s+(?:of the Agreement|Amendment|Revision|Supplement|Series)\b/gi,
   /\bRegulation\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
+  /\bReglamento\s+CEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
+  /\bCEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
   /\bISO\s+\d[\d\s:\-\.]+/gi,
   /\bIEC\s+\d[\d\s:\-\.]+/gi,
   /\bEN\s+\d[\d\s:\-\.]+/gi,
@@ -95,6 +97,8 @@ function extractRegNums(text: string): Set<number> {
     /\bUN\s+R\.?\s*(\d{1,3})\b/gi,
     /\bUNECE\s+R\.?\s*(\d{1,3})\b/gi,
     /\bRegulation\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
+    /\bReglamento\s+CEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
+    /\bCEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
     /\bR\.?\s*(\d{1,3})\s*(?:—|–|-|,|\s)/gi,
     /\bNo\.?\s*(\d{1,3})\b/gi,
   ];

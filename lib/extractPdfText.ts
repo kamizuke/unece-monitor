@@ -9,38 +9,28 @@ export async function extractPdfText(file: File): Promise<{ text: string; pageCo
 
   const buffer = await file.arrayBuffer();
   const bytes  = new Uint8Array(buffer);
-  console.log("[PDF] bytes:", bytes.length);
   const raw    = latin1(bytes);
-  console.log("[PDF] raw string length:", raw.length);
 
   const pageCount = countPages(raw);
-  console.log("[PDF] pageCount:", pageCount);
 
   // Find content streams only (skip images, fonts, metadata)
   const streams = findContentStreams(raw);
-  console.log("[PDF] streams found:", streams.length);
 
   // Decompress in parallel with an overall timeout
-  const t0 = Date.now();
   const parts = await withTimeout(decompressAll(streams), TIMEOUT_MS);
-  console.log("[PDF] decompressed parts:", parts.length, "in", Date.now() - t0, "ms");
 
   // Also scan raw doc for uncompressed BT/ET (catches simple PDFs instantly)
   const rawParts: string[] = [];
   extractBtEt(raw, rawParts);
-  console.log("[PDF] raw BT/ET parts:", rawParts.length);
   parts.push(...rawParts);
 
-  const unique = [...new Set(parts)];
-  console.log("[PDF] unique parts before filter:", unique.length);
-  const text = unique
+  const text = [...new Set(parts)]
     .map(decodePdfString)
     .filter(s => s.trim().length > 1)
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
 
-  console.log("[PDF] final text length:", text.length, "| preview:", text.slice(0, 100));
   return { text, pageCount };
 }
 
