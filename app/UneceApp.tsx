@@ -709,39 +709,7 @@ export default function UneceApp() {
             </div>
           </div>
 
-          {/* Botón generar revisión */}
-          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-            <button
-              onClick={generateReview}
-              disabled={generatingReview || loadingData}
-              style={{
-                background: generatingReview ? "rgba(255,255,255,.1)" : "rgba(124,58,237,.25)",
-                border:"1px solid rgba(167,139,250,.5)",
-                color:"white", borderRadius:6, padding:"6px 14px",
-                fontSize:11, fontWeight:600, cursor: generatingReview ? "not-allowed" : "pointer",
-                fontFamily:T.sans, letterSpacing:"0.04em", whiteSpace:"nowrap" as const,
-                display:"flex", alignItems:"center", gap:6, transition:"all .2s",
-              }}
-            >
-              {generatingReview
-                ? <><span style={{ display:"inline-block", animation:"spin 1s linear infinite" }}>↻</span> Registrando…</>
-                : <>📋 Generar revisión</>}
-            </button>
-            {reviewMsg && (
-              <div style={{
-                position:"absolute", marginTop:52,
-                fontSize:11, fontWeight:500, padding:"4px 10px", borderRadius:4,
-                background: reviewMsg.startsWith("✓") ? T.okBg : T.warnBg,
-                color: reviewMsg.startsWith("✓") ? T.ok : T.warn,
-                border:`1px solid ${reviewMsg.startsWith("✓") ? "#bbf7d0" : "#fde68a"}`,
-                whiteSpace:"nowrap" as const, zIndex:50,
-              }}>
-                {reviewMsg}
-              </div>
-            )}
-          </div>
-
-          {/* Botón ejecutar scraping */}
+          {/* Botón realizar revisión ahora */}
           <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
             <button
               onClick={triggerScraper}
@@ -758,7 +726,7 @@ export default function UneceApp() {
               {triggering ? (
                 <><span style={{ display:"inline-block", animation:"spin 1s linear infinite" }}>↻</span> Lanzando…</>
               ) : (
-                <>▶ Ejecutar ahora</>
+                <>▶ Realizar revisión ahora</>
               )}
             </button>
             {triggerMsg && (
@@ -771,6 +739,38 @@ export default function UneceApp() {
                 whiteSpace:"nowrap" as const, zIndex:50,
               }}>
                 {triggerMsg}
+              </div>
+            )}
+          </div>
+
+          {/* Botón generar evidencia */}
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+            <button
+              onClick={generateReview}
+              disabled={generatingReview || loadingData}
+              style={{
+                background: generatingReview ? "rgba(255,255,255,.1)" : "rgba(124,58,237,.25)",
+                border:"1px solid rgba(167,139,250,.5)",
+                color:"white", borderRadius:6, padding:"6px 14px",
+                fontSize:11, fontWeight:600, cursor: generatingReview ? "not-allowed" : "pointer",
+                fontFamily:T.sans, letterSpacing:"0.04em", whiteSpace:"nowrap" as const,
+                display:"flex", alignItems:"center", gap:6, transition:"all .2s",
+              }}
+            >
+              {generatingReview
+                ? <><span style={{ display:"inline-block", animation:"spin 1s linear infinite" }}>↻</span> Registrando…</>
+                : <>📋 Generar evidencia</>}
+            </button>
+            {reviewMsg && (
+              <div style={{
+                position:"absolute", marginTop:52,
+                fontSize:11, fontWeight:500, padding:"4px 10px", borderRadius:4,
+                background: reviewMsg.startsWith("✓") ? T.okBg : T.warnBg,
+                color: reviewMsg.startsWith("✓") ? T.ok : T.warn,
+                border:`1px solid ${reviewMsg.startsWith("✓") ? "#bbf7d0" : "#fde68a"}`,
+                whiteSpace:"nowrap" as const, zIndex:50,
+              }}>
+                {reviewMsg}
               </div>
             )}
           </div>
