@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { extractText, getDocumentProxy } from "unpdf";
 import {
   extractReferencesFromText,
   extractTestMethods,
@@ -31,14 +32,9 @@ export async function POST(req: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse");
-    const parsed = await pdfParse(buffer);
-
-    const rawText: string = parsed.text || "";
-    const pageCount: number = parsed.numpages || 0;
+    const pdf = await getDocumentProxy(new Uint8Array(arrayBuffer));
+    const { text: rawText } = await extractText(pdf, { mergePages: true });
+    const pageCount = pdf.numPages;
 
     if (!rawText.trim()) {
       return NextResponse.json(
@@ -64,7 +60,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[upload-scope] Error:", err);
     return NextResponse.json(
-      { error: "Error al procesar el PDF. Verifica que el archivo no esté protegido." },
+      { error: `Error al procesar el PDF: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 }
     );
   }

@@ -405,7 +405,7 @@ export default function UneceApp() {
       fd.append("pdf", file);
 
       const res = await fetch("/api/upload-scope", { method: "POST", body: fd });
-      let data: Record<string, unknown>;
+      let data: { error?: string; fileName: string; pageCount: number; rawText: string; extractedReferences: string[]; testMethods: string[]; productCategories: string[]; internalCodes: string[] };
       try {
         data = await res.json();
       } catch {
@@ -414,7 +414,7 @@ export default function UneceApp() {
       }
 
       if (!res.ok) {
-        setScopeError((data.error as string) || "Error al procesar el PDF.");
+        setScopeError(data.error || "Error al procesar el PDF.");
         return;
       }
 
@@ -423,8 +423,7 @@ export default function UneceApp() {
         fileName:    data.fileName,
         uploadedAt:  new Date().toISOString(),
         pageCount:   data.pageCount,
-        // Store truncated raw text to stay within localStorage limits (~100 KB)
-        rawText:     (data.rawText as string).slice(0, 100_000),
+        rawText:     data.rawText.slice(0, 100_000),
         extractedReferences: data.extractedReferences,
         testMethods:         data.testMethods,
         productCategories:   data.productCategories,
