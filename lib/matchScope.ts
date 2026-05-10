@@ -25,16 +25,22 @@ export interface ScopeMatch {
 // ── Reference extraction ──────────────────────────────────────────────────────
 
 const REF_PATTERNS: RegExp[] = [
+  // WP.29 / ECE / UNECE regulation references
   /\bUN\s+Regulation\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
   /\bUNECE\s+R\.?\s*(\d{1,3})\b/gi,
   /\bUN\s+R\.?\s*(\d{1,3})\b/gi,
   /\bR\.?\s*(\d{1,3})\s+(?:of the Agreement|Amendment|Revision|Supplement|Series)\b/gi,
   /\bRegulation\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
-  /\bReglamento\s+CEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
-  /\bCEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
+  /\bCEPE\/ONU\s+(?:N[º°o]?\.?\s*)?(\d{1,3})\b/gi,          // CEPE/ONU 14  (also covers "Reglamento CEPE/ONU 14")
+  /\bECE\s+(?:REGULATION\s+)?N[º°o]?\.?\s*(\d{1,3})\b/gi,   // ECE Nº 10, ECE REGULATION Nº 10
+  // ISO / IEC / EN standards
   /\bISO\s+\d[\d\s:\-\.]+/gi,
   /\bIEC\s+\d[\d\s:\-\.]+/gi,
   /\bEN\s+\d[\d\s:\-\.]+/gi,
+  /\bCISPR\s+\d[\d\s:\-\.]+/gi,
+  /\bFMVSS\s+\d[\d\s:\-\.A-Z]+/gi,
+  /\bSAE\s+[A-Z]\d[\d\s:\-\.]+/gi,
+  // EU Regulations
   /\bReglamento\s+(?:UE|CE|EU)\s+[\d\/]+/gi,
   /\bEC\s+\d+\/\d+\b/gi,
 ];
@@ -96,11 +102,10 @@ function extractRegNums(text: string): Set<number> {
   const patterns = [
     /\bUN\s+R\.?\s*(\d{1,3})\b/gi,
     /\bUNECE\s+R\.?\s*(\d{1,3})\b/gi,
+    /\bUN\s+Regulation\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
     /\bRegulation\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
-    /\bReglamento\s+CEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
-    /\bCEPE\/ONU\s+(?:No\.?\s*)?(\d{1,3})\b/gi,
-    /\bR\.?\s*(\d{1,3})\s*(?:—|–|-|,|\s)/gi,
-    /\bNo\.?\s*(\d{1,3})\b/gi,
+    /\bCEPE\/ONU\s+(?:N[º°o]?\.?\s*)?(\d{1,3})\b/gi,
+    /\bECE\s+(?:REGULATION\s+)?N[º°o]?\.?\s*(\d{1,3})\b/gi,
   ];
   for (const re of patterns) {
     re.lastIndex = 0;
