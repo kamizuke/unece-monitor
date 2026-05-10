@@ -33,9 +33,9 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Dynamically import pdf-parse to avoid issues with Next.js module resolution
+    // Use internal path to avoid pdf-parse accessing test files on serverless (Vercel)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse");
+    const pdfParse = require("pdf-parse/lib/pdf-parse");
     const parsed = await pdfParse(buffer);
 
     const rawText: string = parsed.text || "";
