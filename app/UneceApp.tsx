@@ -118,7 +118,21 @@ const DOC_CFG: Record<string, { color: string; bg: string; label: string; short:
 };
 
 const MOCK_CHANGES: Change[] = [];
-const SCOPE_STORAGE_KEY = "unece_accreditation_scope";
+const SCOPE_STORAGE_KEY    = "unece_accreditation_scope";
+const DEMO_DISMISSED_KEY   = "unece_demo_dismissed";
+
+const DEMO_CHANGE: Change = {
+  id: "c1",
+  reg: 17,
+  doc_type: "AMENDMENT",
+  change_type: "amendment",
+  title: "Supplement 14 to the 09 series of amendments — Seats, head restraints and anchorages",
+  url: "https://unece.org/transport/documents/2024/06/working-documents/ecewp2941-add16supp13",
+  timestamp: new Date().toISOString(),
+  has_pdf: true,
+  has_prev: true,
+  summary: "Este es un ejemplo de cómo aparece un cambio detectado. El monitor rastrea el portal UNECE/CEPE de forma automática y notifica aquí cuando se publican enmiendas, suplementos, revisiones o corrigendos en los reglamentos seleccionados. Pulse «Eliminar ejemplo» para no volver a verlo.",
+};
 
 interface Change {
   id: string;
@@ -332,7 +346,8 @@ function ScopeMatchRow({ match }: { match: ScopeMatch }) {
 
 // ── APP ───────────────────────────────────────────────────────────────────────
 export default function UneceApp() {
-  const [monitored, setMonitored]           = useState(new Set([17, 48, 155, 100]));
+  const [monitored, setMonitored]           = useState(new Set<number>());
+  const [showDemo, setShowDemo]             = useState(false);
   const [view, setView]                     = useState("dashboard");
   const [search, setSearch]                 = useState("");
   const [catFilter, setCatFilter]           = useState("Todos");
@@ -387,6 +402,9 @@ export default function UneceApp() {
       .then(r => r.json())
       .then((cfg: { autorun?: boolean }) => setAutorun(cfg.autorun !== false))
       .catch(() => setAutorun(true));
+
+    // Show demo card unless user already dismissed it
+    setShowDemo(!localStorage.getItem(DEMO_DISMISSED_KEY));
 
     // Load persisted scope from localStorage
     try {
@@ -575,6 +593,11 @@ export default function UneceApp() {
   });
 
   const monChanges = allChanges.filter(c => monitored.has(c.reg));
+
+  const dismissDemo = () => {
+    localStorage.setItem(DEMO_DISMISSED_KEY, "1");
+    setShowDemo(false);
+  };
 
   const requestAnalysis = async (change: Change) => {
     setSelectedChange(change);
@@ -858,14 +881,51 @@ export default function UneceApp() {
                     <div style={{ width:28, height:28, border:`2px solid ${T.blueLight}`, borderTop:`2px solid ${T.blue}`, borderRadius:"50%", margin:"0 auto 12px", animation:"spin 1s linear infinite" }} />
                     <div style={{ fontSize:13, color:T.muted }}>Cargando datos…</div>
                   </div>
-                ) : monChanges.length === 0 ? (
-                  <div style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:6, padding:40, textAlign:"center" as const }}>
-                    <div style={{ fontSize:32, marginBottom:8 }}>✅</div>
-                    <div style={{ fontSize:14, color:T.body, fontWeight:500 }}>Todos los reglamentos están actualizados</div>
-                    <div style={{ fontSize:12, color:T.muted, marginTop:4 }}>Sin cambios en el período monitorizado</div>
-                  </div>
                 ) : (
                   <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+
+                    {/* Demo example card */}
+                    {showDemo && (() => {
+                      const c = DEMO_CHANGE;
+                      const cfg = DOC_CFG[c.doc_type] || {};
+                      const clf = classifyRegulatoryChange(c.summary, { reg: c.reg, doc_type: c.doc_type });
+                      return (
+                        <div style={{ background:"white", border:`1.5px dashed #fbbf24`, borderRadius:6, overflow:"hidden", boxShadow:"0 1px 6px #fbbf2420", animation:"fadeUp .3s ease" }}>
+                          <div style={{ background:"#fffbeb", borderBottom:"1px dashed #fde68a", padding:"6px 18px", display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ fontSize:11, fontWeight:700, color:"#92400e", letterSpacing:"0.06em" }}>EJEMPLO — así se muestra un cambio detectado</span>
+                            <button onClick={dismissDemo} style={{ marginLeft:"auto", fontSize:11, color:"#92400e", background:"transparent", border:"1px solid #fde68a", borderRadius:4, padding:"2px 10px", cursor:"pointer", fontFamily:T.sans, fontWeight:600 }}>
+                              Eliminar ejemplo
+                            </button>
+                          </div>
+                          <div className="change-card-inner" style={{ display:"flex" }}>
+                            <div style={{ width:5, background:cfg.color || T.blue, flexShrink:0 }} />
+                            <div style={{ flex:1, padding:"14px 18px" }}>
+                              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                                <span style={{ fontFamily:T.mono, fontWeight:700, fontSize:13, color:T.blueDeep }}>{regId(c.reg)}</span>
+                                <TypeBadge type={c.doc_type} />
+                                <span style={{ fontSize:11, color:T.muted, marginLeft:"auto" }}>{fmtDate(c.timestamp)}</span>
+                              </div>
+                              <div style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:5 }}>{c.title}</div>
+                              <div style={{ fontSize:12, color:T.muted, lineHeight:1.5 }}>{c.summary}</div>
+                              <div style={{ display:"flex", gap:8, marginTop:10, alignItems:"center", flexWrap:"wrap" as const }}>
+                                {c.has_pdf && <span style={{ fontFamily:T.mono, fontSize:9, color:T.ok, border:`1px solid ${T.ok}40`, background:T.okBg, padding:"2px 7px", borderRadius:3 }}>↓ PDF descargado</span>}
+                                {c.has_prev && <span style={{ fontFamily:T.mono, fontSize:9, color:"#7c3aed", border:"1px solid #ddd6fe", background:"#faf5ff", padding:"2px 7px", borderRadius:3 }}>◈ Versión anterior disponible</span>}
+                              </div>
+                              <ImpactBadge clf={clf} />
+                            </div>
+                            <div className="change-card-action" style={{ display:"flex", alignItems:"center", padding:"0 16px", borderLeft:`1px solid ${T.border}`, background:T.bg }}>
+                              <button disabled style={{
+                                background:T.muted, color:"white", border:"none", borderRadius:5,
+                                padding:"9px 16px", fontSize:12, fontWeight:600, cursor:"not-allowed",
+                                fontFamily:T.sans, whiteSpace:"nowrap" as const, letterSpacing:"0.02em", opacity:0.5,
+                              }}>Analizar IA →</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Real changes */}
                     {monChanges.map(c => {
                       const cfg = DOC_CFG[c.doc_type] || {};
                       const clf = classifyRegulatoryChange(c.summary, { reg: c.reg, doc_type: c.doc_type });
@@ -881,7 +941,6 @@ export default function UneceApp() {
                               <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
                                 <span style={{ fontFamily:T.mono, fontWeight:700, fontSize:13, color:T.blueDeep }}>{regId(c.reg)}</span>
                                 <TypeBadge type={c.doc_type} />
-                                {c.id === "c1" && <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.07em", color:"#92400e", background:"#fef3c7", border:"1px solid #fde68a", padding:"2px 7px", borderRadius:3 }}>EJEMPLO</span>}
                                 <span style={{ fontSize:11, color:T.muted, marginLeft:"auto" }}>{fmtDate(c.timestamp)}</span>
                               </div>
                               <div style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:5 }}>{c.title}</div>
@@ -890,11 +949,7 @@ export default function UneceApp() {
                                 {c.has_pdf && <span style={{ fontFamily:T.mono, fontSize:9, color:T.ok, border:`1px solid ${T.ok}40`, background:T.okBg, padding:"2px 7px", borderRadius:3 }}>↓ PDF descargado</span>}
                                 {c.has_prev && <span style={{ fontFamily:T.mono, fontSize:9, color:"#7c3aed", border:"1px solid #ddd6fe", background:"#faf5ff", padding:"2px 7px", borderRadius:3 }}>◈ Versión anterior disponible</span>}
                               </div>
-
-                              {/* Impact classification badge */}
                               <ImpactBadge clf={clf} />
-
-                              {/* Scope match row (only if scope loaded) */}
                               {scopeMatch && <ScopeMatchRow match={scopeMatch} />}
                             </div>
                             <div className="change-card-action" style={{ display:"flex", alignItems:"center", padding:"0 16px", borderLeft:`1px solid ${T.border}`, background:T.bg }}>
@@ -908,6 +963,15 @@ export default function UneceApp() {
                         </div>
                       );
                     })}
+
+                    {/* Empty state — only when no demo and no real changes */}
+                    {!showDemo && monChanges.length === 0 && (
+                      <div style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:6, padding:40, textAlign:"center" as const }}>
+                        <div style={{ fontSize:32, marginBottom:8 }}>✅</div>
+                        <div style={{ fontSize:14, color:T.body, fontWeight:500 }}>Todos los reglamentos están actualizados</div>
+                        <div style={{ fontSize:12, color:T.muted, marginTop:4 }}>Sin cambios en el período monitorizado</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
