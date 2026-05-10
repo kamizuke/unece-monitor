@@ -843,6 +843,7 @@ export default function UneceApp() {
                               <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
                                 <span style={{ fontFamily:T.mono, fontWeight:700, fontSize:13, color:T.blueDeep }}>{regId(c.reg)}</span>
                                 <TypeBadge type={c.doc_type} />
+                                {c.id === "c1" && <span style={{ fontSize:9, fontWeight:700, letterSpacing:"0.07em", color:"#92400e", background:"#fef3c7", border:"1px solid #fde68a", padding:"2px 7px", borderRadius:3 }}>EJEMPLO</span>}
                                 <span style={{ fontSize:11, color:T.muted, marginLeft:"auto" }}>{fmtDate(c.timestamp)}</span>
                               </div>
                               <div style={{ fontSize:13.5, fontWeight:600, color:T.text, marginBottom:5 }}>{c.title}</div>
