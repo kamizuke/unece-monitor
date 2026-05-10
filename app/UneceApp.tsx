@@ -1483,16 +1483,17 @@ export default function UneceApp() {
                         <div style={{ fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.08em", textTransform:"uppercase" as const }}>
                           Reglamentos UNECE detectados en el alcance
                         </div>
-                        {unmonitored.length > 0 ? (
+                        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" as const }}>
                           <button
-                            onClick={() => setMonitored(prev => { const s = new Set(prev); unmonitored.forEach(n => s.add(n)); return s; })}
+                            onClick={() => setMonitored(prev => { const s = new Set(prev); scopeNums.forEach(n => s.add(n)); return s; })}
                             style={{ background:T.blue, color:"white", border:"none", borderRadius:6, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:T.sans, whiteSpace:"nowrap" as const }}
                           >
-                            ＋ Añadir {unmonitored.length} a vigilancia
+                            ＋ Añadir todos a vigilancia
                           </button>
-                        ) : (
-                          <span style={{ fontSize:11, color:T.ok, fontWeight:600 }}>✓ Todos ya están en vigilancia</span>
-                        )}
+                          {unmonitored.length === 0 && (
+                            <span style={{ fontSize:11, color:T.ok, fontWeight:600 }}>✓ Todos ya en vigilancia</span>
+                          )}
+                        </div>
                       </div>
                       <div style={{ display:"flex", flexWrap:"wrap" as const, gap:6 }}>
                         {scopeNums.map(n => {
