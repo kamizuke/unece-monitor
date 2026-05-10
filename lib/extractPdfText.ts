@@ -172,24 +172,29 @@ function extractStrings(block: string, out: string[]): void {
   const tj = /\(([^)]*(?:\\.[^)]*)*)\)\s*Tj/g;
   while ((m = tj.exec(block)) !== null) out.push(m[1]);
 
-  // [(str)...] TJ
+  // [(str)num...] TJ — concatenate all strings in the array into one chunk
+  // (kerned text splits each glyph as a separate string with spacing numbers)
   const tjA = /\[([\s\S]*?)\]\s*TJ/g;
   while ((m = tjA.exec(block)) !== null) {
     const inner = /\(([^)]*(?:\\.[^)]*)*)\)/g;
     let s: RegExpExecArray | null;
-    while ((s = inner.exec(m[1])) !== null) out.push(s[1]);
+    const parts: string[] = [];
+    while ((s = inner.exec(m[1])) !== null) parts.push(s[1]);
+    if (parts.length > 0) out.push(parts.join(""));
   }
 
   // <hex> Tj  (CID/CMap fonts)
   const tjH = /<([0-9A-Fa-f]+)>\s*Tj/g;
   while ((m = tjH.exec(block)) !== null) out.push(hexToText(m[1]));
 
-  // [<hex>...] TJ
+  // [<hex>...] TJ — concatenate hex glyphs
   const tjHA = /\[([\s\S]*?)\]\s*TJ/g;
   while ((m = tjHA.exec(block)) !== null) {
     const hi = /<([0-9A-Fa-f]+)>/g;
     let h: RegExpExecArray | null;
-    while ((h = hi.exec(m[1])) !== null) out.push(hexToText(h[1]));
+    const parts: string[] = [];
+    while ((h = hi.exec(m[1])) !== null) parts.push(hexToText(h[1]));
+    if (parts.length > 0) out.push(parts.join(""));
   }
 }
 
