@@ -514,7 +514,7 @@ export default function UneceApp() {
       const record: ReviewRecord = {
         reviewId:             crypto.randomUUID(),
         reviewDate:           now,
-        reviewedBy:           reviewerName.trim() || "Sistema",
+        reviewedBy:           (reviewerName || loadReviewerName()).trim() || "Sistema",
         source:               "https://unece.org/transport/vehicle-regulations",
         regulationsReviewed,
         totalReviewed:        regulationsReviewed.length,
@@ -981,6 +981,17 @@ export default function UneceApp() {
                     {autorunSaving ? "…" : autorun ? "Pausar" : "Activar"}
                   </button>
                 </div>
+              </div>
+
+              {/* Reviewer name — always visible so it's set before generating */}
+              <div style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:6, padding:"10px 14px" }}>
+                <div style={{ fontSize:10, fontWeight:700, color:T.muted, letterSpacing:"0.08em", textTransform:"uppercase" as const, marginBottom:7 }}>Revisor</div>
+                <input
+                  value={reviewerName}
+                  onChange={e => { setReviewerName(e.target.value); saveReviewerName(e.target.value); }}
+                  placeholder="Nombre del técnico responsable…"
+                  style={{ width:"100%", boxSizing:"border-box" as const, border:`1.5px solid ${T.border2}`, borderRadius:5, padding:"6px 10px", fontFamily:T.sans, fontSize:12, color:T.text, background:T.bg }}
+                />
               </div>
 
               {/* Scope summary in sidebar */}
