@@ -133,7 +133,7 @@ interface Change {
 }
 
 function regId(n: number) { return `R${String(n).padStart(3, "0")}`; }
-function fmtDate(ts: string) { return new Date(ts).toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric" }); }
+function fmtDate(ts: string) { return new Date(ts).toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric", timeZone:"Europe/Madrid" }); }
 
 // ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
 
@@ -679,7 +679,7 @@ export default function UneceApp() {
             <div style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>ÚLTIMA REVISIÓN</div>
             <div style={{ fontFamily:T.mono, fontSize:11, opacity:.85 }}>
               {lastCheck
-                ? new Date(lastCheck).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" })
+                ? new Date(lastCheck).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })
                 : "—"}
             </div>
           </div>
@@ -1218,7 +1218,7 @@ export default function UneceApp() {
                     <div>
                       <div style={{ fontSize:15, fontWeight:700, color:T.text, marginBottom:4 }}>{scope.fileName}</div>
                       <div style={{ fontSize:11.5, color:T.muted }}>
-                        Cargado el {new Date(scope.uploadedAt).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" })}
+                        Cargado el {new Date(scope.uploadedAt).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })}
                         {" · "}{scope.pageCount} páginas
                       </div>
                     </div>
@@ -1624,7 +1624,7 @@ export default function UneceApp() {
                           <div style={{ flex:1 }}>
                             <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" as const }}>
                               <span style={{ fontFamily:T.mono, fontSize:13, fontWeight:700, color:T.blueDeep }}>
-                                {new Date(review.reviewDate).toLocaleDateString("es-ES", { day:"2-digit", month:"long", year:"numeric" })}
+                                {new Date(review.reviewDate).toLocaleDateString("es-ES", { day:"2-digit", month:"long", year:"numeric", timeZone:"Europe/Madrid" })}
                               </span>
                               <span style={{ fontFamily:T.mono, fontSize:11, color:T.muted }}>
                                 {new Date(review.reviewDate).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" })}
