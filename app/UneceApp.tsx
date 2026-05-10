@@ -1212,6 +1212,63 @@ export default function UneceApp() {
                 }}
               />
 
+              {/* URL input */}
+              <div style={{ display:"flex", alignItems:"center", gap:8, margin:"4px 0 12px" }}>
+                <div style={{ flex:1, height:1, background:T.border }} />
+                <span style={{ fontSize:11, color:T.dim, whiteSpace:"nowrap" as const }}>o pega la URL del certificado ENAC</span>
+                <div style={{ flex:1, height:1, background:T.border }} />
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <input
+                  id="enac-url-input"
+                  type="url"
+                  placeholder="https://www.enac.es/documents/…"
+                  disabled={scopeUploading}
+                  style={{
+                    flex:1, border:`1.5px solid ${T.border2}`, borderRadius:6,
+                    padding:"8px 12px", fontFamily:T.sans, fontSize:12.5,
+                    color:T.text, background: scopeUploading ? T.bg : "white",
+                  }}
+                />
+                <button
+                  disabled={scopeUploading}
+                  onClick={async () => {
+                    const input = document.getElementById("enac-url-input") as HTMLInputElement;
+                    const url = input?.value?.trim();
+                    if (!url) return;
+                    setScopeUploading(true);
+                    setScopeError(null);
+                    setScopeSuccess(null);
+                    try {
+                      const res = await fetch("/api/fetch-scope-pdf", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ url }),
+                      });
+                      if (!res.ok) {
+                        const d = await res.json().catch(() => ({})) as { error?: string };
+                        throw new Error(d.error ?? `Error ${res.status}`);
+                      }
+                      const blob = await res.blob();
+                      const fileName = url.split("/").pop()?.replace(/[?#].*/, "") || "enac-alcance.pdf";
+                      const file = new File([blob], fileName.endsWith(".pdf") ? fileName : fileName + ".pdf", { type: "application/pdf" });
+                      if (input) input.value = "";
+                      await handlePdfUpload(file);
+                    } catch (e: unknown) {
+                      setScopeError(`✗ ${e instanceof Error ? e.message : "Error al descargar el PDF"}`);
+                      setScopeUploading(false);
+                    }
+                  }}
+                  style={{
+                    background: scopeUploading ? T.border2 : T.blue, color:"white", border:"none",
+                    borderRadius:6, padding:"8px 18px", fontSize:12.5, fontWeight:600,
+                    cursor: scopeUploading ? "not-allowed" : "pointer", fontFamily:T.sans, whiteSpace:"nowrap" as const,
+                  }}
+                >
+                  Cargar URL
+                </button>
+              </div>
+
               {/* Messages */}
               {scopeError && (
                 <div style={{ background:"#fef2f2", border:"1px solid #fca5a5", borderRadius:6, padding:"10px 14px", fontSize:12.5, color:"#b91c1c", display:"flex", alignItems:"center", gap:8 }}>
