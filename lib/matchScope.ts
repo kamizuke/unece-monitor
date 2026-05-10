@@ -90,7 +90,7 @@ export function extractInternalCodes(text: string): string[] {
 
 // ── Regulation number extraction from scope text ──────────────────────────────
 
-function extractRegNums(text: string): Set<number> {
+export function extractRegNums(text: string): Set<number> {
   const nums = new Set<number>();
   const patterns = [
     /\bUN\s+R\.?\s*(\d{1,3})\b/gi,

@@ -10,6 +10,7 @@ import {
   extractTestMethods,
   extractProductCategories,
   extractInternalCodes,
+  extractRegNums,
 } from "@/lib/matchScope";
 import {
   ReviewRecord,
@@ -1263,6 +1264,60 @@ export default function UneceApp() {
                     </div>
                   </div>
                 )}
+
+                {/* Auto-select regulations from scope */}
+                {(() => {
+                  const scopeNums = [...extractRegNums(scope.rawText)]
+                    .filter(n => ALL_REGS.some(r => r.n === n))
+                    .sort((a, b) => a - b);
+                  if (scopeNums.length === 0) return null;
+                  const unmonitored = scopeNums.filter(n => !monitored.has(n));
+                  return (
+                    <div style={{ background:"white", border:`1.5px solid ${T.blue}40`, borderRadius:8, padding:20, boxShadow:"0 1px 3px rgba(0,0,0,.04)" }}>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap" as const, gap:10, marginBottom:14 }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.08em", textTransform:"uppercase" as const }}>
+                          Reglamentos UNECE detectados en el alcance
+                        </div>
+                        {unmonitored.length > 0 ? (
+                          <button
+                            onClick={() => setMonitored(prev => { const s = new Set(prev); unmonitored.forEach(n => s.add(n)); return s; })}
+                            style={{ background:T.blue, color:"white", border:"none", borderRadius:6, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:T.sans, whiteSpace:"nowrap" as const }}
+                          >
+                            ＋ Añadir {unmonitored.length} a vigilancia
+                          </button>
+                        ) : (
+                          <span style={{ fontSize:11, color:T.ok, fontWeight:600 }}>✓ Todos ya están en vigilancia</span>
+                        )}
+                      </div>
+                      <div style={{ display:"flex", flexWrap:"wrap" as const, gap:6 }}>
+                        {scopeNums.map(n => {
+                          const reg = ALL_REGS.find(r => r.n === n);
+                          const isOn = monitored.has(n);
+                          return (
+                            <button
+                              key={n}
+                              onClick={() => toggleReg(n)}
+                              title={reg?.title}
+                              style={{
+                                fontFamily:T.mono, fontSize:11, padding:"4px 11px", borderRadius:5, cursor:"pointer",
+                                border:`1.5px solid ${isOn ? T.blue : T.border2}`,
+                                background: isOn ? T.blueLight : "white",
+                                color: isOn ? T.blueDeep : T.muted,
+                                fontWeight: isOn ? 700 : 500,
+                                transition:"all .15s",
+                              }}
+                            >
+                              {isOn ? "✓ " : ""}{regId(n)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ fontSize:10.5, color:T.dim, marginTop:10 }}>
+                        Haz clic en cada reglamento para activar o desactivar su vigilancia individualmente.
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Test methods */}
                 {scope.testMethods.length > 0 && (
