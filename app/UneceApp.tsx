@@ -110,11 +110,11 @@ const ALL_REGS = [
 
 const CATS = ["Todos", "Iluminación", "Frenado", "Seguridad Pasiva", "ADAS", "Emisiones", "Electrónica", "EV/Híbrido", "Seguridad", "Ruido", "General", "EPI"];
 
-const DOC_CFG: Record<string, { color: string; bg: string; label: string; short: string; icon: string }> = {
-  REVISION:    { color: T.rev,  bg: T.blueFaint, label: "Revisión",    short: "REV", icon: "📘" },
-  AMENDMENT:   { color: T.am,   bg: "#faf5ff",   label: "Amendment",   short: "AM",  icon: "📝" },
-  SUPPLEMENT:  { color: T.sup,  bg: "#f0f9ff",   label: "Supplement",  short: "SUP", icon: "➕" },
-  CORRIGENDUM: { color: T.cor,  bg: "#fff7ed",   label: "Corrigendum", short: "COR", icon: "🔧" },
+const DOC_CFG: Record<string, { color: string; bg: string; label: string; short: string; icon: string; desc: string }> = {
+  REVISION:    { color: T.rev,  bg: T.blueFaint, label: "Revisión",    short: "REV", icon: "📘", desc: "Reescritura completa del reglamento. Reemplaza la versión anterior en su totalidad e implica cambios estructurales importantes. Requiere evaluación completa del impacto en los procedimientos del laboratorio." },
+  AMENDMENT:   { color: T.am,   bg: "#faf5ff",   label: "Amendment",   short: "AM",  icon: "📝", desc: "Modificación puntual de artículos específicos de un reglamento en vigor. Puede añadir, modificar o suprimir requisitos técnicos concretos. Es el tipo de cambio más frecuente." },
+  SUPPLEMENT:  { color: T.sup,  bg: "#f0f9ff",   label: "Supplement",  short: "SUP", icon: "➕", desc: "Adición de nuevas series de enmiendas o de requisitos opcionales/alternativos al reglamento. No modifica los requisitos existentes, sino que los amplía." },
+  CORRIGENDUM: { color: T.cor,  bg: "#fff7ed",   label: "Corrigendum", short: "COR", icon: "🔧", desc: "Corrección de errores tipográficos, de traducción o editoriales en un texto ya publicado. Generalmente no implica cambios técnicos sustanciales en los ensayos." },
 };
 
 const MOCK_CHANGES: Change[] = [];
@@ -364,6 +364,7 @@ export default function UneceApp() {
   const [scopeUploading, setScopeUploading] = useState(false);
   const [scopeError, setScopeError]     = useState<string | null>(null);
   const [scopeSuccess, setScopeSuccess] = useState<string | null>(null);
+  const [expandedDocType, setExpandedDocType] = useState<string | null>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
 
   // ── Load data on mount ────────────────────────────────────────────────────
@@ -951,13 +952,27 @@ export default function UneceApp() {
 
               <div style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:6, padding:16 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:T.muted, letterSpacing:"0.08em", textTransform:"uppercase" as const, marginBottom:12 }}>Tipos de documento</div>
-                {Object.entries(DOC_CFG).map(([type, cfg]) => (
-                  <div key={type} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-                    <span style={{ fontSize:14 }}>{cfg.icon}</span>
-                    <TypeBadge type={type} />
-                    <span style={{ fontSize:11.5, color:T.muted }}>{cfg.label}</span>
-                  </div>
-                ))}
+                {Object.entries(DOC_CFG).map(([type, cfg]) => {
+                  const [open, setOpen] = [expandedDocType === type, (v: boolean) => setExpandedDocType(v ? type : null)];
+                  return (
+                    <div key={type} style={{ marginBottom:6 }}>
+                      <div
+                        onClick={() => setOpen(!open)}
+                        style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"4px 0", userSelect:"none" as const }}
+                      >
+                        <span style={{ fontSize:14 }}>{cfg.icon}</span>
+                        <TypeBadge type={type} />
+                        <span style={{ fontSize:11.5, color:T.muted, flex:1 }}>{cfg.label}</span>
+                        <span style={{ fontSize:10, color:T.dim, transition:"transform .2s", display:"inline-block", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>▾</span>
+                      </div>
+                      {open && (
+                        <div style={{ fontSize:11.5, color:T.body, lineHeight:1.6, padding:"6px 10px 4px 34px", background:cfg.bg, borderRadius:5, marginTop:2 }}>
+                          {cfg.desc}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={{ background: autorun === false ? "#fef9ec" : T.blueLight, border:`1px solid ${autorun === false ? "#fde68a" : T.blue + "30"}`, borderRadius:6, padding:16 }}>
