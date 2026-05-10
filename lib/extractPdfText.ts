@@ -3,11 +3,7 @@
 export async function extractPdfText(file: File): Promise<{ text: string; pageCount: number }> {
   const pdfjsLib = await import("pdfjs-dist");
 
-  // Use the bundled worker via URL to avoid separate worker file issues
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url
-  ).toString();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
