@@ -93,20 +93,31 @@ async function processStream(dictOrHeader: string, content: string, out: string[
 // ── Decompression ─────────────────────────────────────────────────────────────
 
 async function tryDecompress(latin1Content: string): Promise<string | null> {
-  // Recover original bytes from latin1 string (bijective)
   const compressed = Uint8Array.from(
     { length: latin1Content.length },
     (_, i) => latin1Content.charCodeAt(i)
   );
 
-  for (const format of ["deflate", "deflate-raw"] as const) {
+  if (compressed.length < 2) return null;
+
+  // Check for valid zlib magic bytes — avoids wasting cycles on non-compressed data
+  const b0 = compressed[0];
+  const b1 = compressed[1];
+  const hasZlibHeader = b0 === 0x78 && (b1 === 0x01 || b1 === 0x5E || b1 === 0x9C || b1 === 0xDA);
+
+  const formats: CompressionFormat[] = hasZlibHeader
+    ? ["deflate", "deflate-raw"]   // try zlib first, raw as fallback
+    : ["deflate-raw"];             // no zlib header, try raw deflate only
+
+  for (const format of formats) {
     try {
       const ds     = new DecompressionStream(format);
       const writer = ds.writable.getWriter();
       const reader = ds.readable.getReader();
 
-      writer.write(compressed);
-      writer.close();
+      // Await both write and close so their promise rejections are caught
+      await writer.write(compressed);
+      await writer.close();
 
       const chunks: Uint8Array[] = [];
       // eslint-disable-next-line no-constant-condition
@@ -123,7 +134,7 @@ async function tryDecompress(latin1Content: string): Promise<string | null> {
 
       return new TextDecoder("latin1").decode(result);
     } catch {
-      // try next format
+      // try next format silently
     }
   }
   return null;
