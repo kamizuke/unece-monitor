@@ -3,25 +3,18 @@
 export async function extractPdfText(file: File): Promise<{ text: string; pageCount: number }> {
   const buffer = await file.arrayBuffer();
   const bytes  = new Uint8Array(buffer);
-
-  // latin1 gives us a bijective byte↔char mapping so we can recover exact bytes later
-  const raw = new TextDecoder("latin1").decode(bytes);
+  const raw    = new TextDecoder("latin1").decode(bytes);
 
   const pageCount = countPages(raw);
-  const parts: string[] = [];
+  const streams   = findStreams(raw);           // fast: scans only object headers
+  const parts     = await decompressAll(streams); // parallel decompression
 
-  // Strategy 1 — streams with explicit /Length (most reliable, avoids false endstream matches)
-  await extractStreamsViaLength(raw, parts);
+  // Also scan the raw doc for uncompressed BT/ET (handles simple PDFs)
+  const rawParts: string[] = [];
+  extractBtEt(raw, rawParts);
+  parts.push(...rawParts);
 
-  // Strategy 2 — streams without reliable length (fallback regex, risky with binary data)
-  if (parts.length === 0) {
-    await extractStreamsFallback(raw, parts);
-  }
-
-  // Strategy 3 — direct BT/ET search in the raw document (uncompressed PDFs or metadata)
-  extractBtEt(raw, parts);
-
-  const text = dedupe(parts)
+  const text = [...new Set(parts)]
     .map(decodePdfString)
     .filter(s => s.trim().length > 1)
     .join(" ")
@@ -31,66 +24,60 @@ export async function extractPdfText(file: File): Promise<{ text: string; pageCo
   return { text, pageCount };
 }
 
-// ── Strategy 1: use explicit /Length to find exact stream boundaries ──────────
-// This avoids the "false endstream" problem with binary compressed data.
+// ── Find stream data via "N M obj" markers ────────────────────────────────────
+// PDF objects start with "N M obj". Scanning for this is far more specific
+// than <<...>> and avoids thousands of false matches inside binary data.
 
-async function extractStreamsViaLength(raw: string, out: string[]): Promise<void> {
-  const re = /<<([\s\S]{1,2000}?)>>\s*stream\r?\n/g;
-  const tasks: Promise<string[]>[] = [];
+interface StreamEntry { header: string; content: string }
+
+function findStreams(raw: string): StreamEntry[] {
+  const entries: StreamEntry[] = [];
+
+  // Match each object header up to the stream keyword
+  // "N M obj … /Length NNN … >> stream\n"
+  const objRe = /\d+\s+\d+\s+obj\b([\s\S]{1,3000}?)stream\r?\n/g;
   let m: RegExpExecArray | null;
 
-  while ((m = re.exec(raw)) !== null) {
-    const dict      = m[1];
+  while ((m = objRe.exec(raw)) !== null) {
+    const header    = m[1];
     const dataStart = m.index + m[0].length;
 
-    const lenMatch = dict.match(/\/Length\s+(\d+)(?!\s+\d+\s*R\b)/);
+    // Extract using explicit /Length (avoids reading binary data with regex)
+    const lenMatch = header.match(/\/Length\s+(\d+)(?!\s+\d+\s*R\b)/);
     if (!lenMatch) continue;
 
     const length = parseInt(lenMatch[1], 10);
     if (length <= 0 || dataStart + length > raw.length) continue;
 
-    const content = raw.slice(dataStart, dataStart + length);
-    tasks.push(processStream(dict, content));
+    entries.push({ header, content: raw.slice(dataStart, dataStart + length) });
   }
 
-  const results = await Promise.all(tasks);
-  for (const r of results) out.push(...r);
+  return entries;
 }
 
-// ── Strategy 2: regex-based stream extraction (fallback) ─────────────────────
+// ── Decompress all streams in parallel ────────────────────────────────────────
 
-async function extractStreamsFallback(raw: string, out: string[]): Promise<void> {
-  const re = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
-  const tasks: Promise<string[]>[] = [];
-  let m: RegExpExecArray | null;
-
-  while ((m = re.exec(raw)) !== null) {
-    const content     = m[1];
-    const headerChunk = raw.slice(Math.max(0, m.index - 800), m.index);
-    tasks.push(processStream(headerChunk, content));
-  }
-
+async function decompressAll(streams: StreamEntry[]): Promise<string[]> {
+  const tasks = streams.map(({ header, content }) => processStream(header, content));
   const results = await Promise.all(tasks);
-  for (const r of results) out.push(...r);
+  return results.flat();
 }
 
-// ── Shared stream processor ───────────────────────────────────────────────────
-
-async function processStream(dictOrHeader: string, content: string): Promise<string[]> {
+async function processStream(header: string, content: string): Promise<string[]> {
   const out: string[] = [];
-  const isFlate   = /\/Filter\s*(?:\/FlateDecode|\[[\s\S]{0,60}\/FlateDecode[\s\S]{0,60}\])/.test(dictOrHeader);
-  const isAscii85 = /\/Filter\s*(?:\/ASCII85Decode|\[[\s\S]{0,60}\/ASCII85Decode[\s\S]{0,60}\])/.test(dictOrHeader);
-  const isHex     = /\/Filter\s*(?:\/ASCIIHexDecode|\[[\s\S]{0,60}\/ASCIIHexDecode[\s\S]{0,60}\])/.test(dictOrHeader);
+  const isFlate   = /\/Filter\s*(?:\/FlateDecode|\[[\s\S]{0,80}\/FlateDecode[\s\S]{0,80}\])/.test(header);
+  const isAscii85 = /\/Filter\s*(?:\/ASCII85Decode|\[[\s\S]{0,80}\/ASCII85Decode[\s\S]{0,80}\])/.test(header);
+  const isHex     = /\/Filter\s*(?:\/ASCIIHexDecode|\[[\s\S]{0,80}\/ASCIIHexDecode[\s\S]{0,80}\])/.test(header);
 
   if (isFlate) {
-    const decomp = await tryDecompress(content);
-    if (decomp) extractBtEt(decomp, out);
+    const text = await tryDecompress(content);
+    if (text) extractBtEt(text, out);
   } else if (isAscii85) {
-    const decoded = decodeAscii85(content);
-    if (decoded) extractBtEt(decoded, out);
+    const text = decodeAscii85(content);
+    if (text) extractBtEt(text, out);
   } else if (isHex) {
-    const decoded = decodeHex(content);
-    if (decoded) extractBtEt(decoded, out);
+    const text = decodeHex(content);
+    if (text) extractBtEt(text, out);
   } else {
     extractBtEt(content, out);
   }
@@ -100,75 +87,123 @@ async function processStream(dictOrHeader: string, content: string): Promise<str
 
 // ── Decompression ─────────────────────────────────────────────────────────────
 
-async function tryDecompress(latin1Content: string): Promise<string | null> {
-  const compressed = Uint8Array.from(
-    { length: latin1Content.length },
-    (_, i) => latin1Content.charCodeAt(i)
-  );
+async function tryDecompress(latin1: string): Promise<string | null> {
+  const buf = Uint8Array.from({ length: latin1.length }, (_, i) => latin1.charCodeAt(i));
+  if (buf.length < 2) return null;
 
-  if (compressed.length < 2) return null;
+  // Only attempt if bytes look like a valid zlib or deflate stream
+  const b0 = buf[0], b1 = buf[1];
+  const isZlib = b0 === 0x78 && (b1 === 0x01 || b1 === 0x5E || b1 === 0x9C || b1 === 0xDA);
 
-  // Check for valid zlib magic bytes — avoids wasting cycles on non-compressed data
-  const b0 = compressed[0];
-  const b1 = compressed[1];
-  const hasZlibHeader = b0 === 0x78 && (b1 === 0x01 || b1 === 0x5E || b1 === 0x9C || b1 === 0xDA);
-
-  const formats: CompressionFormat[] = hasZlibHeader
-    ? ["deflate", "deflate-raw"]   // try zlib first, raw as fallback
-    : ["deflate-raw"];             // no zlib header, try raw deflate only
-
-  for (const format of formats) {
+  for (const fmt of (isZlib ? ["deflate", "deflate-raw"] : ["deflate-raw"]) as CompressionFormat[]) {
     try {
-      const ds     = new DecompressionStream(format);
+      const ds     = new DecompressionStream(fmt);
       const writer = ds.writable.getWriter();
       const reader = ds.readable.getReader();
 
-      // Await both write and close so their promise rejections are caught
-      await writer.write(compressed);
+      await writer.write(buf);
       await writer.close();
 
       const chunks: Uint8Array[] = [];
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value as Uint8Array);
       }
 
-      const total  = chunks.reduce((s, c) => s + c.length, 0);
-      const result = new Uint8Array(total);
-      let   offset = 0;
-      for (const c of chunks) { result.set(c, offset); offset += c.length; }
+      const total = chunks.reduce((s, c) => s + c.length, 0);
+      const out   = new Uint8Array(total);
+      let   pos   = 0;
+      for (const c of chunks) { out.set(c, pos); pos += c.length; }
 
-      return new TextDecoder("latin1").decode(result);
-    } catch {
-      // try next format silently
-    }
+      return new TextDecoder("latin1").decode(out);
+    } catch { /* try next */ }
   }
   return null;
 }
 
-// ── ASCII85 decoder (used by some PDF generators) ─────────────────────────────
+// ── Text extraction ───────────────────────────────────────────────────────────
+
+function extractBtEt(text: string, out: string[]): void {
+  const btEt = /BT\b([\s\S]*?)\bET\b/g;
+  let block: RegExpExecArray | null;
+  while ((block = btEt.exec(text)) !== null) {
+    extractStrings(block[1], out);
+  }
+}
+
+function extractStrings(content: string, out: string[]): void {
+  // (string) Tj
+  const tj = /\(([^)]*(?:\\.[^)]*)*)\)\s*Tj/g;
+  let m: RegExpExecArray | null;
+  while ((m = tj.exec(content)) !== null) out.push(m[1]);
+
+  // [(str) gap] TJ
+  const tjArr = /\[([\s\S]*?)\]\s*TJ/g;
+  while ((m = tjArr.exec(content)) !== null) {
+    const inner = /\(([^)]*(?:\\.[^)]*)*)\)/g;
+    let s: RegExpExecArray | null;
+    while ((s = inner.exec(m[1])) !== null) out.push(s[1]);
+  }
+
+  // <hex> Tj  — handles CID/CMap fonts (common in modern PDFs)
+  const tjHex = /<([0-9A-Fa-f]+)>\s*Tj/g;
+  while ((m = tjHex.exec(content)) !== null) {
+    out.push(hexToText(m[1]));
+  }
+
+  // [<hex> gap] TJ
+  const tjHexArr = /\[([\s\S]*?)\]\s*TJ/g;
+  while ((m = tjHexArr.exec(content)) !== null) {
+    const hexInner = /<([0-9A-Fa-f]+)>/g;
+    let h: RegExpExecArray | null;
+    while ((h = hexInner.exec(m[1])) !== null) out.push(hexToText(h[1]));
+  }
+}
+
+function hexToText(hex: string): string {
+  // Try UTF-16BE (4 hex chars per char, common in Adobe PDFs)
+  if (hex.length % 4 === 0 && hex.length >= 4) {
+    let s = "";
+    for (let i = 0; i < hex.length; i += 4) {
+      const cp = parseInt(hex.slice(i, i + 4), 16);
+      if (cp > 31) s += String.fromCodePoint(cp);
+    }
+    if (s.trim()) return s;
+  }
+  // Single-byte fallback
+  let s = "";
+  for (let i = 0; i < hex.length; i += 2) {
+    const b = parseInt(hex.slice(i, i + 2), 16);
+    if (b > 31 && b < 128) s += String.fromCharCode(b);
+  }
+  return s;
+}
+
+// ── Minor helpers ─────────────────────────────────────────────────────────────
+
+function countPages(raw: string): number {
+  const m = raw.match(/\/Count\s+(\d+)/);
+  return m ? parseInt(m[1], 10) : 1;
+}
 
 function decodeAscii85(s: string): string | null {
   try {
     const clean = s.replace(/\s/g, "").replace(/~>$/, "");
     const bytes: number[] = [];
-    let   i = 0;
+    let i = 0;
     while (i < clean.length) {
       if (clean[i] === "z") { bytes.push(0, 0, 0, 0); i++; continue; }
-      const group = clean.slice(i, i + 5).padEnd(5, "u");
-      let   val   = 0;
-      for (const c of group) val = val * 85 + (c.charCodeAt(0) - 33);
-      const count = Math.min(4, clean.length - i);
-      for (let j = 0; j < count; j++) bytes.push((val >>> (24 - j * 8)) & 0xff);
+      const g   = clean.slice(i, i + 5).padEnd(5, "u");
+      let   val = 0;
+      for (const c of g) val = val * 85 + (c.charCodeAt(0) - 33);
+      const n = Math.min(4, clean.length - i);
+      for (let j = 0; j < n; j++) bytes.push((val >>> (24 - j * 8)) & 0xff);
       i += 5;
     }
     return new TextDecoder("latin1").decode(new Uint8Array(bytes));
   } catch { return null; }
 }
-
-// ── Hex decoder ───────────────────────────────────────────────────────────────
 
 function decodeHex(s: string): string | null {
   try {
@@ -179,84 +214,9 @@ function decodeHex(s: string): string | null {
   } catch { return null; }
 }
 
-// ── BT/ET text extraction ─────────────────────────────────────────────────────
-
-function extractBtEt(text: string, out: string[]): void {
-  // Standard BT...ET text blocks
-  const btEt = /BT\b([\s\S]*?)\bET\b/g;
-  let block: RegExpExecArray | null;
-  while ((block = btEt.exec(text)) !== null) {
-    extractStringsFromBlock(block[1], out);
-  }
-}
-
-function extractStringsFromBlock(content: string, out: string[]): void {
-  // (string) Tj
-  const tj = /\(([^)]*(?:\\.[^)]*)*)\)\s*Tj/g;
-  let m: RegExpExecArray | null;
-  while ((m = tj.exec(content)) !== null) out.push(m[1]);
-
-  // [(str) gap (str) ...] TJ
-  const tjArr = /\[([\s\S]*?)\]\s*TJ/g;
-  while ((m = tjArr.exec(content)) !== null) {
-    const inner = /\(([^)]*(?:\\.[^)]*)*)\)/g;
-    let s: RegExpExecArray | null;
-    while ((s = inner.exec(m[1])) !== null) out.push(s[1]);
-  }
-
-  // <hex string> Tj  (hex-encoded text)
-  const tjHex = /<([0-9A-Fa-f]+)>\s*Tj/g;
-  while ((m = tjHex.exec(content)) !== null) {
-    const hex = m[1];
-    let str = "";
-    // Try UTF-16BE first (common for CID fonts), then single bytes
-    if (hex.length % 4 === 0 && hex.length >= 4) {
-      let utf16 = "";
-      for (let i = 0; i < hex.length; i += 4) {
-        const cp = parseInt(hex.slice(i, i + 4), 16);
-        if (cp > 31) utf16 += String.fromCodePoint(cp);
-      }
-      if (utf16.trim().length > 0) { out.push(utf16); continue; }
-    }
-    // Single-byte hex
-    for (let i = 0; i < hex.length; i += 2) {
-      const byte = parseInt(hex.slice(i, i + 2), 16);
-      if (byte > 31 && byte < 128) str += String.fromCharCode(byte);
-    }
-    if (str.trim()) out.push(str);
-  }
-
-  // <hex string> TJ arrays
-  const tjHexArr = /\[([\s\S]*?)\]\s*TJ/g;
-  while ((m = tjHexArr.exec(content)) !== null) {
-    const hexInner = /<([0-9A-Fa-f]+)>/g;
-    let h: RegExpExecArray | null;
-    while ((h = hexInner.exec(m[1])) !== null) {
-      let str = "";
-      const hex = h[1];
-      for (let i = 0; i < hex.length; i += 2) {
-        const byte = parseInt(hex.slice(i, i + 2), 16);
-        if (byte > 31 && byte < 128) str += String.fromCharCode(byte);
-      }
-      if (str.trim()) out.push(str);
-    }
-  }
-}
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
-function countPages(raw: string): number {
-  const m = raw.match(/\/Count\s+(\d+)/);
-  return m ? parseInt(m[1], 10) : 1;
-}
-
-function dedupe(arr: string[]): string[] {
-  return [...new Set(arr)];
-}
-
 function decodePdfString(s: string): string {
   return s
     .replace(/\\n/g, " ").replace(/\\r/g, " ").replace(/\\t/g, "\t")
     .replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\")
-    .replace(/\\(\d{3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
+    .replace(/\\(\d{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8)));
 }
