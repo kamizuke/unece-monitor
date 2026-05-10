@@ -1042,16 +1042,32 @@ export default function UneceApp() {
                   {[...monitored].length} / {ALL_REGS.length}
                 </span>
               </div>
-              <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const }}>
-                {CATS.map(cat => (
-                  <button key={cat} onClick={() => setCatFilter(cat)} style={{
-                    padding:"4px 12px", borderRadius:20,
-                    border:`1.5px solid ${catFilter === cat ? T.blue : T.border2}`,
-                    background: catFilter === cat ? T.blueLight : "transparent",
-                    color: catFilter === cat ? T.blueDeep : T.muted,
-                    fontFamily:T.sans, fontSize:11.5, fontWeight:catFilter === cat ? 600 : 400, cursor:"pointer",
-                  }}>{cat}</button>
-                ))}
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap" as const, gap:8 }}>
+                <div style={{ display:"flex", gap:6, flexWrap:"wrap" as const }}>
+                  {CATS.map(cat => (
+                    <button key={cat} onClick={() => setCatFilter(cat)} style={{
+                      padding:"4px 12px", borderRadius:20,
+                      border:`1.5px solid ${catFilter === cat ? T.blue : T.border2}`,
+                      background: catFilter === cat ? T.blueLight : "transparent",
+                      color: catFilter === cat ? T.blueDeep : T.muted,
+                      fontFamily:T.sans, fontSize:11.5, fontWeight:catFilter === cat ? 600 : 400, cursor:"pointer",
+                    }}>{cat}</button>
+                  ))}
+                </div>
+                <div style={{ display:"flex", gap:6 }}>
+                  <button
+                    onClick={() => setMonitored(new Set(filtered.map(r => r.n)))}
+                    style={{ padding:"4px 14px", borderRadius:20, border:`1.5px solid ${T.blue}`, background:T.blueLight, color:T.blueDeep, fontFamily:T.sans, fontSize:11.5, fontWeight:600, cursor:"pointer" }}
+                  >
+                    Seleccionar {filtered.length < ALL_REGS.length ? "filtrados" : "todos"}
+                  </button>
+                  <button
+                    onClick={() => setMonitored(prev => { const s = new Set(prev); filtered.forEach(r => s.delete(r.n)); return s; })}
+                    style={{ padding:"4px 14px", borderRadius:20, border:`1.5px solid ${T.border2}`, background:"white", color:T.muted, fontFamily:T.sans, fontSize:11.5, fontWeight:600, cursor:"pointer" }}
+                  >
+                    Deseleccionar {filtered.length < ALL_REGS.length ? "filtrados" : "todos"}
+                  </button>
+                </div>
               </div>
             </div>
 
