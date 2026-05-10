@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { githubToken } from "@/lib/serverAuth";
 
 export const runtime = "edge";
 
 export async function POST() {
-  const token = githubToken();
+  const token = process.env.GITHUB_PAT || process.env.GH_PAT;
   if (!token) {
     return NextResponse.json(
       { error: "GITHUB_PAT no está configurada en las variables de entorno." },
