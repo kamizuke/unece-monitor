@@ -108,19 +108,36 @@ function MarkdownRenderer({ content }: { content: string }) {
     } else if (line.trim() === "") {
       elements.push(<div key={i} className="h-2" />);
     } else {
-      const formatted = line
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 rounded font-mono text-xs">$1</code>');
       elements.push(
-        <p
-          key={i}
-          className="text-sm text-gray-600 leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: formatted }}
-        />
+        <p key={i} className="text-sm text-gray-600 leading-relaxed">
+          <InlineMarkdown text={line} />
+        </p>
       );
     }
     i++;
   }
 
   return <>{elements}</>;
+}
+
+function InlineMarkdown({ text }: { text: string }) {
+  const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g).filter(Boolean);
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={index}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith("`") && part.endsWith("`")) {
+          return (
+            <code key={index} className="bg-gray-100 px-1 rounded font-mono text-xs">
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+        return <span key={index}>{part}</span>;
+      })}
+    </>
+  );
 }

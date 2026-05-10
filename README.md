@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UNECE Regulatory Monitor
 
-## Getting Started
+Web para vigilar cambios en reglamentos UNECE/WP.29 y generar evidencia de revisión para laboratorios con alcance ISO/IEC 17025.
 
-First, run the development server:
+## Desarrollo
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Variables De Entorno
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Opcionales en desarrollo, recomendadas en producción:
 
-## Learn More
+```bash
+ADMIN_TOKEN=clave-interna-para-acciones-sensibles
+GH_PAT=github-token-con-permiso-contents-y-actions
+ANTHROPIC_API_KEY=clave-para-analisis-ia
+```
 
-To learn more about Next.js, take a look at the following resources:
+También se acepta `GITHUB_PAT` como alias de `GH_PAT`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Si `ADMIN_TOKEN` está configurado, las acciones sensibles de la UI pedirán la clave la primera vez:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- lanzar revisión manual
+- guardar reglamentos vigilados
+- activar/desactivar ejecución automática
+- generar análisis IA
 
-## Deploy on Vercel
+## Comandos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run build
+npx tsc --noEmit
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notas De Operación
+
+Actualmente la configuración y los cambios publicados se leen desde `public/config.json`, `public/state.json` y `public/changes_log.json`. Esto es suficiente para una demo o una instalación controlada, pero para uso formal en auditoría conviene migrarlo a una base de datos con usuarios, roles y trazabilidad inmutable.
+
+El scraper está en `scraper/monitor.py` y actualiza el estado comparando documentos detectados con hashes conocidos. Para producción conviene ampliar la fuente UNECE, guardar hash de PDF, fecha de publicación, versión/serie y evidencia descargada.

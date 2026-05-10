@@ -124,6 +124,7 @@ const MOCK_CHANGES: Change[] = [];
 const SCOPE_STORAGE_KEY    = "unece_accreditation_scope";
 const DEMO_DISMISSED_KEY   = "unece_demo_dismissed";
 const BASELINE_KEY         = "unece_baseline_set";
+const ADMIN_TOKEN_KEY      = "unece_admin_token";
 
 const DEMO_CHANGE: Change = {
   id: "c1",
@@ -153,6 +154,29 @@ interface Change {
 
 function regId(n: number) { return `R${String(n).padStart(3, "0")}`; }
 function fmtDate(ts: string) { return new Date(ts).toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric", timeZone:"Europe/Madrid" }); }
+
+async function fetchWithAdminAuth(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const storedToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+  if (storedToken) headers.set("x-admin-token", storedToken);
+
+  const first = await fetch(input, { ...init, headers });
+  if (first.status !== 401) return first;
+
+  let body: { authRequired?: boolean } | null = null;
+  try { body = await first.clone().json(); } catch {/* ignore */}
+  if (!body?.authRequired) return first;
+
+  const token = window.prompt("Clave de administrador");
+  if (!token) return first;
+
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+  const retryHeaders = new Headers(init.headers);
+  retryHeaders.set("x-admin-token", token);
+  const retry = await fetch(input, { ...init, headers: retryHeaders });
+  if (retry.status === 401) localStorage.removeItem(ADMIN_TOKEN_KEY);
+  return retry;
+}
 
 // ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
 
@@ -442,7 +466,7 @@ export default function UneceApp() {
     const next = !autorun;
     setAutorunSaving(true);
     try {
-      const res = await fetch("/api/toggle-auto", {
+      const res = await fetchWithAdminAuth("/api/toggle-auto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ autorun: next }),
@@ -586,7 +610,7 @@ export default function UneceApp() {
     setTriggering(true);
     setTriggerMsg(null);
     try {
-      const res = await fetch("/api/trigger", { method: "POST" });
+      const res = await fetchWithAdminAuth("/api/trigger", { method: "POST" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error desconocido");
       setLastCheck(new Date().toISOString());
@@ -619,7 +643,7 @@ export default function UneceApp() {
     setSavingConfig(true);
     setSaveConfigMsg(null);
     try {
-      const res = await fetch("/api/save-config", {
+      const res = await fetchWithAdminAuth("/api/save-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ regulations: [...monitored].sort((a, b) => a - b) }),
@@ -648,7 +672,7 @@ export default function UneceApp() {
     setAiLoading(true);
     setAiReport("");
     try {
-      const res = await fetch("/api/analyze", {
+      const res = await fetchWithAdminAuth("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

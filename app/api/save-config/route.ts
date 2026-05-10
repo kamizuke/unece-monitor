@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { githubToken, requireAdmin } from "@/lib/serverAuth";
 
 export const runtime = "nodejs";
 
@@ -8,13 +9,29 @@ const PATH  = "public/config.json";
 const API   = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`;
 
 export async function POST(req: NextRequest) {
-  const pat = process.env.GH_PAT;
+  const unauthorized = requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
+  const pat = githubToken();
   if (!pat) {
-    return NextResponse.json({ error: "GH_PAT no configurado en el servidor." }, { status: 500 });
+    return NextResponse.json({ error: "GH_PAT/GITHUB_PAT no configurado en el servidor." }, { status: 500 });
   }
 
   try {
     const body = await req.json() as { autorun?: boolean; regulations?: number[] };
+    if (body.autorun !== undefined && typeof body.autorun !== "boolean") {
+      return NextResponse.json({ error: "El campo 'autorun' debe ser booleano." }, { status: 400 });
+    }
+    if (body.regulations !== undefined) {
+      if (!Array.isArray(body.regulations)) {
+        return NextResponse.json({ error: "El campo 'regulations' debe ser un array." }, { status: 400 });
+      }
+      const invalid = body.regulations.find(n => !Number.isInteger(n) || n < 1 || n > 200);
+      if (invalid !== undefined) {
+        return NextResponse.json({ error: "Los reglamentos deben ser números enteros entre 1 y 200." }, { status: 400 });
+      }
+      body.regulations = [...new Set(body.regulations)].sort((a, b) => a - b);
+    }
 
     // Fetch current file to get SHA and existing values
     const getRes = await fetch(API, {
