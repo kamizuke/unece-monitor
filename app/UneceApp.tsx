@@ -379,6 +379,8 @@ export default function UneceApp() {
   // ── Autorun toggle state ──────────────────────────────────────────────────
   const [autorun, setAutorun]           = useState<boolean | null>(null); // null = loading
   const [autorunSaving, setAutorunSaving] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [saveConfigMsg, setSaveConfigMsg] = useState<string | null>(null);
 
   // ── Accreditation scope state ─────────────────────────────────────────────
   const [scope, setScope]               = useState<AccreditationScope | null>(null);
@@ -403,10 +405,15 @@ export default function UneceApp() {
       .then((s: { last_check?: string }) => { if (s.last_check) setLastCheck(s.last_check); })
       .catch(() => {});
 
-    // Load autorun flag from config.json
+    // Load autorun + monitored regulations from config.json
     fetch("/config.json?_=" + Date.now())
       .then(r => r.json())
-      .then((cfg: { autorun?: boolean }) => setAutorun(cfg.autorun !== false))
+      .then((cfg: { autorun?: boolean; regulations?: number[] }) => {
+        setAutorun(cfg.autorun !== false);
+        if (Array.isArray(cfg.regulations) && cfg.regulations.length > 0) {
+          setMonitored(new Set(cfg.regulations));
+        }
+      })
       .catch(() => setAutorun(true));
 
     // Show demo card unless user already dismissed it
@@ -607,6 +614,26 @@ export default function UneceApp() {
   const toggleReg = (n: number) => setMonitored(prev => {
     const s = new Set(prev); s.has(n) ? s.delete(n) : s.add(n); return s;
   });
+
+  async function saveMonitored() {
+    setSavingConfig(true);
+    setSaveConfigMsg(null);
+    try {
+      const res = await fetch("/api/save-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regulations: [...monitored].sort((a, b) => a - b) }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Error desconocido");
+      setSaveConfigMsg("✓ Configuración guardada — el monitor usará estos reglamentos");
+    } catch (e: unknown) {
+      setSaveConfigMsg(`✗ ${e instanceof Error ? e.message : "Error al guardar"}`);
+    } finally {
+      setSavingConfig(false);
+      setTimeout(() => setSaveConfigMsg(null), 6000);
+    }
+  }
 
   const monChanges = allChanges.filter(c => monitored.has(c.reg));
 
@@ -1188,6 +1215,32 @@ export default function UneceApp() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Save to monitor button */}
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+              <button
+                onClick={saveMonitored}
+                disabled={savingConfig || monitored.size === 0}
+                style={{
+                  background: savingConfig ? T.muted : T.blue, color:"white", border:"none",
+                  borderRadius:6, padding:"9px 20px", fontSize:12, fontWeight:600,
+                  cursor: savingConfig || monitored.size === 0 ? "not-allowed" : "pointer",
+                  fontFamily:T.sans, display:"flex", alignItems:"center", gap:6, opacity: monitored.size === 0 ? 0.5 : 1,
+                }}
+              >
+                {savingConfig
+                  ? <><span style={{ display:"inline-block", animation:"spin 1s linear infinite" }}>↻</span> Guardando…</>
+                  : <>💾 Guardar en monitor ({monitored.size} reglamentos)</>}
+              </button>
+              {saveConfigMsg && (
+                <span style={{
+                  fontSize:11.5, fontWeight:500, padding:"4px 10px", borderRadius:4,
+                  background: saveConfigMsg.startsWith("✓") ? T.okBg : T.warnBg,
+                  color: saveConfigMsg.startsWith("✓") ? T.ok : T.warn,
+                  border:`1px solid ${saveConfigMsg.startsWith("✓") ? "#bbf7d0" : "#fde68a"}`,
+                }}>{saveConfigMsg}</span>
+              )}
             </div>
 
             <div className="selector-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))", gap:6 }}>

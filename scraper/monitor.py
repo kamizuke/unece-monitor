@@ -15,10 +15,11 @@ from playwright.sync_api import sync_playwright
 
 BASE_URL = "https://unece.org/transport/vehicle-regulations-wp29/standards/addenda-1958-agreement-regulations-0-20"
 ROOT = Path(__file__).parent.parent
-STATE_FILE = ROOT / "public" / "state.json"
-LOG_FILE = ROOT / "public" / "changes_log.json"
-CONFIG_FILE = Path(__file__).parent / "config.json"
-PDF_DIR = Path(__file__).parent / "pdfs"
+STATE_FILE  = ROOT / "public" / "state.json"
+LOG_FILE    = ROOT / "public" / "changes_log.json"
+CONFIG_FILE = ROOT / "public" / "config.json"   # shared with the UI
+EMAIL_CFG   = Path(__file__).parent / "config.json"  # email-only local config
+PDF_DIR     = Path(__file__).parent / "pdfs"
 
 DOC_TYPES = ["AMENDMENT", "CORRIGENDUM", "SUPPLEMENT", "REVISION", "ADDENDUM"]
 
@@ -146,6 +147,8 @@ def download_pdfs(changes: list[dict]):
 def main():
     config = load_json(CONFIG_FILE, {"regulations": [17, 48, 100, 155]})
     regs = config.get("regulations", [17, 48, 100, 155])
+    if not regs:
+        regs = [17, 48, 100, 155]
     state = load_json(STATE_FILE, {"last_check": None, "regulations": {}})
 
     print(f"[monitor] Monitoring regulations: {regs}")
