@@ -551,7 +551,15 @@ export default function UneceApp() {
       const res = await fetch("/api/trigger", { method: "POST" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error desconocido");
+      setLastCheck(new Date().toISOString());
       setTriggerMsg("✓ Scraping iniciado — los resultados aparecerán en ~2 min");
+      // Re-fetch state after scraper likely finishes
+      setTimeout(() => {
+        fetch("/state.json?_=" + Date.now())
+          .then(r => r.json())
+          .then((s: { last_check?: string }) => { if (s.last_check) setLastCheck(s.last_check); })
+          .catch(() => {});
+      }, 150_000); // 2.5 min
     } catch (e: unknown) {
       setTriggerMsg(`✗ ${e instanceof Error ? e.message : "Error al lanzar el scraper"}`);
     } finally {
