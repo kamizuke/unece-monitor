@@ -6,6 +6,10 @@ import {
   matchChangeAgainstScope,
   AccreditationScope,
   ScopeMatch,
+  extractReferencesFromText,
+  extractTestMethods,
+  extractProductCategories,
+  extractInternalCodes,
 } from "@/lib/matchScope";
 import {
   ReviewRecord,
@@ -412,14 +416,10 @@ export default function UneceApp() {
     }
   }
 
-  // ── PDF Upload ────────────────────────────────────────────────────────────
+  // ── PDF Upload (client-side extraction — no server, no size limit) ──────────
   async function handlePdfUpload(file: File) {
     if (file.type !== "application/pdf") {
       setScopeError("El archivo debe ser un PDF.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setScopeError("El archivo supera el límite de 10 MB.");
       return;
     }
 
@@ -428,43 +428,39 @@ export default function UneceApp() {
     setScopeSuccess(null);
 
     try {
-      const fd = new FormData();
-      fd.append("pdf", file);
+      const { extractPdfText } = await import("@/lib/extractPdfText");
+      const { text: rawText, pageCount } = await extractPdfText(file);
 
-      const res = await fetch("/api/upload-scope", { method: "POST", body: fd });
-      let data: { error?: string; fileName: string; pageCount: number; rawText: string; extractedReferences: string[]; testMethods: string[]; productCategories: string[]; internalCodes: string[] };
-      try {
-        data = await res.json();
-      } catch {
-        setScopeError(`Error del servidor (${res.status}). Inténtalo de nuevo.`);
+      if (!rawText.trim()) {
+        setScopeError("No se pudo extraer texto del PDF. El archivo puede ser una imagen escaneada sin OCR.");
         return;
       }
 
-      if (!res.ok) {
-        setScopeError(data.error || "Error al procesar el PDF.");
-        return;
-      }
+      const extractedReferences = extractReferencesFromText(rawText);
+      const testMethods         = extractTestMethods(rawText);
+      const productCategories   = extractProductCategories(rawText);
+      const internalCodes       = extractInternalCodes(rawText);
 
       const newScope: AccreditationScope = {
         id:          crypto.randomUUID(),
-        fileName:    data.fileName,
+        fileName:    file.name,
         uploadedAt:  new Date().toISOString(),
-        pageCount:   data.pageCount,
-        rawText:     data.rawText.slice(0, 100_000),
-        extractedReferences: data.extractedReferences,
-        testMethods:         data.testMethods,
-        productCategories:   data.productCategories,
-        internalCodes:       data.internalCodes,
+        pageCount,
+        rawText:     rawText.slice(0, 100_000),
+        extractedReferences,
+        testMethods,
+        productCategories,
+        internalCodes,
       };
 
       setScope(newScope);
       localStorage.setItem(SCOPE_STORAGE_KEY, JSON.stringify(newScope));
       setScopeSuccess(
-        `Alcance procesado: ${data.extractedReferences.length} referencias, ` +
-        `${data.testMethods.length} métodos detectados.`
+        `Alcance procesado: ${extractedReferences.length} referencias, ` +
+        `${testMethods.length} métodos detectados.`
       );
-    } catch {
-      setScopeError("Error de red al subir el archivo.");
+    } catch (err) {
+      setScopeError(`Error al procesar el PDF: ${err instanceof Error ? err.message : "inténtalo de nuevo."}`);
     } finally {
       setScopeUploading(false);
     }
