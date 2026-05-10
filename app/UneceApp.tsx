@@ -813,7 +813,7 @@ export default function UneceApp() {
                           <span style={{ fontFamily:T.mono, fontWeight:700, fontSize:14, color:T.blueDeep }}>{regId(n)}</span>
                           {hasChange
                             ? <StatusPill ok={false} label="Cambio" />
-                            : <StatusPill ok={true} label="OK" />}
+                            : <StatusPill ok={true} label="Sin cambio desde la última revisión" />}
                         </div>
                         <div style={{ fontSize:11.5, color:T.muted, lineHeight:1.4 }}>{reg?.title}</div>
                         <div style={{ fontSize:10, color:T.dim, marginTop:4, fontFamily:T.mono }}>{reg?.cat}</div>
