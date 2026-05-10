@@ -845,10 +845,15 @@ export default function UneceApp() {
                   })}
                   {monitored.size === 0 && (
                     <div style={{ gridColumn:"1/-1", textAlign:"center" as const, padding:40, color:T.muted, background:"white", borderRadius:6, border:`1px dashed ${T.border2}` }}>
-                      <div style={{ fontSize:13 }}>Sin reglamentos seleccionados</div>
-                      <button onClick={() => setView("selector")} style={{ marginTop:10, background:T.blue, color:"white", border:"none", borderRadius:4, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
-                        Añadir reglamentos →
-                      </button>
+                      <div style={{ fontSize:13, marginBottom:14 }}>Sin reglamentos seleccionados</div>
+                      <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" as const }}>
+                        <button onClick={() => setView("selector")} style={{ background:T.blue, color:"white", border:"none", borderRadius:4, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                          Añadir reglamentos →
+                        </button>
+                        <button onClick={() => setView("scope")} style={{ background:"white", color:T.blue, border:`1.5px solid ${T.blue}`, borderRadius:4, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                          📄 Subir alcance
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
