@@ -1,73 +1,118 @@
 "use client";
 
 /**
- * Extracts plain text from a PDF file by parsing its content streams directly.
- * Works in any browser without a worker. Handles standard text-based PDFs;
- * image-only (scanned) PDFs will return empty text.
+ * Extracts plain text from a PDF by parsing and decompressing its content streams.
+ * Uses the browser's native DecompressionStream (zlib/FlateDecode).
+ * Works with standard text-based PDFs. Image-only/scanned PDFs return empty text.
  */
 export async function extractPdfText(file: File): Promise<{ text: string; pageCount: number }> {
   const buffer = await file.arrayBuffer();
   const bytes  = new Uint8Array(buffer);
 
-  // Decode as latin-1 to preserve byte values intact
+  // latin1 is a bijective map byte↔char, so we can always recover bytes with charCodeAt
   const raw = new TextDecoder("latin1").decode(bytes);
 
-  const text      = parsePdfText(raw);
   const pageCount = countPages(raw);
+  const parts: string[] = [];
+
+  await extractAllStreams(raw, parts);
+
+  // Fallback: try direct BT/ET on raw (uncompressed PDFs or content outside streams)
+  extractBtEt(raw, parts);
+
+  const text = parts
+    .map(decodePdfString)
+    .filter(s => s.trim().length > 0)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 
   return { text, pageCount };
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function countPages(raw: string): number {
   const m = raw.match(/\/Count\s+(\d+)/);
   return m ? parseInt(m[1], 10) : 1;
 }
 
-function parsePdfText(raw: string): string {
-  const parts: string[] = [];
-
-  // Decompress any FlateDecode streams if possible
-  const streams = extractStreams(raw);
-
-  for (const stream of streams) {
-    extractBtEt(stream, parts);
-  }
-
-  // Also scan the raw document for uncompressed text blocks
-  extractBtEt(raw, parts);
-
-  return parts
-    .map(s => decodePdfString(s))
-    .filter(s => s.trim().length > 0)
-    .join(" ");
-}
-
-function extractStreams(raw: string): string[] {
-  const result: string[] = [];
+async function extractAllStreams(raw: string, out: string[]): Promise<void> {
+  // Locate every stream…endstream block and its preceding object header
   const re = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
   let m: RegExpExecArray | null;
+
   while ((m = re.exec(raw)) !== null) {
-    result.push(m[1]);
+    const streamContent = m[1];
+    const startIdx      = m.index;
+
+    // Look back up to 500 chars for the object header that declares filters
+    const header = raw.slice(Math.max(0, startIdx - 500), startIdx);
+    const isFlate = /\/Filter\s*(?:\/FlateDecode|\[.*\/FlateDecode.*\])/.test(header);
+
+    if (isFlate) {
+      const decompressed = await tryDecompress(streamContent);
+      if (decompressed) extractBtEt(decompressed, out);
+    } else {
+      extractBtEt(streamContent, out);
+    }
   }
-  return result;
+}
+
+async function tryDecompress(latin1Content: string): Promise<string | null> {
+  try {
+    // Recover original bytes from latin1 string
+    const compressed = Uint8Array.from(
+      { length: latin1Content.length },
+      (_, i) => latin1Content.charCodeAt(i)
+    );
+
+    // Try zlib format first (standard FlateDecode), then raw deflate as fallback
+    for (const format of ["deflate", "deflate-raw"] as const) {
+      try {
+        const ds     = new DecompressionStream(format);
+        const writer = ds.writable.getWriter();
+        const reader = ds.readable.getReader();
+
+        writer.write(compressed);
+        writer.close();
+
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value as Uint8Array);
+        }
+
+        const total  = chunks.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(total);
+        let offset   = 0;
+        for (const c of chunks) { result.set(c, offset); offset += c.length; }
+
+        return new TextDecoder("latin1").decode(result);
+      } catch {
+        // try next format
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function extractBtEt(text: string, out: string[]): void {
-  // Text blocks between BT and ET operators
   const btEt = /BT\b([\s\S]*?)\bET\b/g;
   let block: RegExpExecArray | null;
 
   while ((block = btEt.exec(text)) !== null) {
     const content = block[1];
 
-    // (string) Tj  — simple string
+    // (string) Tj
     const tj = /\(([^)]*(?:\\.[^)]*)*)\)\s*Tj/g;
     let m: RegExpExecArray | null;
     while ((m = tj.exec(content)) !== null) out.push(m[1]);
 
-    // [(str) num (str)] TJ  — spaced string array
+    // [(str) num ...] TJ
     const tjArr = /\[([\s\S]*?)\]\s*TJ/g;
     while ((m = tjArr.exec(content)) !== null) {
       const inner = /\(([^)]*(?:\\.[^)]*)*)\)/g;
@@ -75,20 +120,11 @@ function extractBtEt(text: string, out: string[]): void {
       while ((s = inner.exec(m[1])) !== null) out.push(s[1]);
     }
   }
-
-  // Also catch strings outside BT/ET (some generators skip them)
-  const loose = /\(([A-Za-z0-9 .,;:\-/]{4,80})\)\s*Tj/g;
-  let m: RegExpExecArray | null;
-  while ((m = loose.exec(text)) !== null) out.push(m[1]);
 }
 
 function decodePdfString(s: string): string {
   return s
-    .replace(/\\n/g, " ")
-    .replace(/\\r/g, " ")
-    .replace(/\\t/g, " ")
-    .replace(/\\\(/g, "(")
-    .replace(/\\\)/g, ")")
-    .replace(/\\\\/g, "\\")
+    .replace(/\\n/g, " ").replace(/\\r/g, " ").replace(/\\t/g, " ")
+    .replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\")
     .replace(/\\(\d{3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
 }
