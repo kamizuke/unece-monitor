@@ -405,10 +405,16 @@ export default function UneceApp() {
       fd.append("pdf", file);
 
       const res = await fetch("/api/upload-scope", { method: "POST", body: fd });
-      const data = await res.json();
+      let data: Record<string, unknown>;
+      try {
+        data = await res.json();
+      } catch {
+        setScopeError(`Error del servidor (${res.status}). Inténtalo de nuevo.`);
+        return;
+      }
 
       if (!res.ok) {
-        setScopeError(data.error || "Error al procesar el PDF.");
+        setScopeError((data.error as string) || "Error al procesar el PDF.");
         return;
       }
 
