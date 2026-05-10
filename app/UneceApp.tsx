@@ -1453,77 +1453,95 @@ export default function UneceApp() {
                   </div>
                 </div>
 
-                {/* Extracted references */}
-                {scope.extractedReferences.length > 0 && (
-                  <div style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:8, padding:20, boxShadow:"0 1px 3px rgba(0,0,0,.04)" }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.08em", textTransform:"uppercase" as const, marginBottom:14 }}>
-                      Referencias normativas detectadas
-                    </div>
-                    <div style={{ display:"flex", flexWrap:"wrap" as const, gap:6 }}>
-                      {scope.extractedReferences.map((ref, i) => (
-                        <span key={i} style={{
-                          fontFamily:T.mono, fontSize:10.5, padding:"3px 10px",
-                          background:T.blueLight, color:T.blueDeep,
-                          border:`1px solid ${T.blue}30`, borderRadius:4,
-                        }}>{ref}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Auto-select regulations from scope */}
+                {/* Detected references + regulation chips — unified section */}
                 {(() => {
-                  const scopeNums = [...extractRegNums(scope.rawText)]
-                    .sort((a, b) => a - b);
-                  if (scopeNums.length === 0) return null;
+                  // Union: numbers from raw text + numbers parsed from each reference string
+                  const numsFromText = extractRegNums(scope.rawText);
+                  const numsFromRefs = new Set<number>();
+                  scope.extractedReferences.forEach(ref => extractRegNums(ref).forEach(n => numsFromRefs.add(n)));
+                  const scopeNums = [...new Set([...numsFromText, ...numsFromRefs])].sort((a, b) => a - b);
+
+                  const hasAny = scopeNums.length > 0 || scope.extractedReferences.length > 0;
+                  if (!hasAny) return null;
+
                   const unmonitored = scopeNums.filter(n => !monitored.has(n));
                   return (
                     <div style={{ background:"white", border:`1.5px solid ${T.blue}40`, borderRadius:8, padding:20, boxShadow:"0 1px 3px rgba(0,0,0,.04)" }}>
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap" as const, gap:10, marginBottom:14 }}>
+                      {/* Header */}
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap" as const, gap:10, marginBottom:16 }}>
                         <div style={{ fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.08em", textTransform:"uppercase" as const }}>
-                          Reglamentos UNECE detectados en el alcance
+                          Referencias detectadas en el alcance
                         </div>
-                        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" as const }}>
-                          <button
-                            onClick={() => setMonitored(prev => { const s = new Set(prev); scopeNums.forEach(n => s.add(n)); return s; })}
-                            style={{ background:T.blue, color:"white", border:"none", borderRadius:6, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:T.sans, whiteSpace:"nowrap" as const }}
-                          >
-                            ＋ Añadir todos a vigilancia
-                          </button>
-                          {unmonitored.length === 0 && (
-                            <span style={{ fontSize:11, color:T.ok, fontWeight:600 }}>✓ Todos ya en vigilancia</span>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ display:"flex", flexWrap:"wrap" as const, gap:6 }}>
-                        {scopeNums.map(n => {
-                          const reg = ALL_REGS.find(r => r.n === n);
-                          const isOn = monitored.has(n);
-                          return (
+                        {scopeNums.length > 0 && (
+                          <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" as const }}>
                             <button
-                              key={n}
-                              onClick={() => toggleReg(n)}
-                              title={reg?.title ?? `UN Regulation ${n}`}
-                              style={{
-                                fontFamily:T.mono, fontSize:11, padding:"4px 11px", borderRadius:5, cursor:"pointer",
-                                border:`1.5px solid ${isOn ? T.blue : T.border2}`,
-                                background: isOn ? T.blueLight : "white",
-                                color: isOn ? T.blueDeep : T.muted,
-                                fontWeight: isOn ? 700 : 500,
-                                transition:"all .15s",
-                              }}
+                              onClick={() => setMonitored(prev => { const s = new Set(prev); scopeNums.forEach(n => s.add(n)); return s; })}
+                              style={{ background:T.blue, color:"white", border:"none", borderRadius:6, padding:"7px 16px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:T.sans, whiteSpace:"nowrap" as const }}
                             >
-                              {isOn ? "✓ " : ""}{regId(n)}{!reg ? " *" : ""}
+                              ＋ Añadir todos a vigilancia
                             </button>
-                          );
-                        })}
-                      </div>
-                      <div style={{ fontSize:10.5, color:T.dim, marginTop:10 }}>
-                        Haz clic en cada reglamento para activar o desactivar su vigilancia individualmente.
-                        {scopeNums.some(n => !ALL_REGS.find(r => r.n === n)) && (
-                          <span> · <span style={{ color:T.warn }}>*</span> Reglamento detectado no incluido aún en el catálogo del monitor.</span>
+                            {unmonitored.length === 0 && (
+                              <span style={{ fontSize:11, color:T.ok, fontWeight:600 }}>✓ Todos en vigilancia</span>
+                            )}
+                          </div>
                         )}
                       </div>
+
+                      {/* Regulation number chips — clickable, each toggles vigilancia */}
+                      {scopeNums.length > 0 && (
+                        <>
+                          <div style={{ fontSize:10, fontWeight:700, color:T.dim, letterSpacing:"0.07em", textTransform:"uppercase" as const, marginBottom:6 }}>
+                            Reglamentos UNECE / ECE
+                          </div>
+                          <div style={{ display:"flex", flexWrap:"wrap" as const, gap:6, marginBottom:14 }}>
+                            {scopeNums.map(n => {
+                              const reg = ALL_REGS.find(r => r.n === n);
+                              const isOn = monitored.has(n);
+                              return (
+                                <button
+                                  key={n}
+                                  onClick={() => toggleReg(n)}
+                                  title={reg?.title ?? `UN Regulation ${n} — haz clic para activar/desactivar vigilancia`}
+                                  style={{
+                                    fontFamily:T.mono, fontSize:11, padding:"4px 11px", borderRadius:5, cursor:"pointer",
+                                    border:`1.5px solid ${isOn ? T.blue : T.border2}`,
+                                    background: isOn ? T.blueLight : "white",
+                                    color: isOn ? T.blueDeep : T.muted,
+                                    fontWeight: isOn ? 700 : 500,
+                                    transition:"all .15s",
+                                  }}
+                                >
+                                  {isOn ? "✓ " : ""}{regId(n)}{!reg ? " *" : ""}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Raw reference strings */}
+                      {scope.extractedReferences.length > 0 && (
+                        <>
+                          <div style={{ fontSize:10, fontWeight:700, color:T.dim, letterSpacing:"0.07em", textTransform:"uppercase" as const, marginBottom:6 }}>
+                            Texto literal en el documento
+                          </div>
+                          <div style={{ display:"flex", flexWrap:"wrap" as const, gap:5 }}>
+                            {scope.extractedReferences.map((ref, i) => (
+                              <span key={i} style={{
+                                fontFamily:T.mono, fontSize:10, padding:"2px 8px",
+                                background:T.bg, color:T.muted,
+                                border:`1px solid ${T.border}`, borderRadius:4,
+                              }}>{ref}</span>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      {scopeNums.some(n => !ALL_REGS.find(r => r.n === n)) && (
+                        <div style={{ fontSize:10, color:T.dim, marginTop:10 }}>
+                          <span style={{ color:T.warn }}>*</span> Reglamento detectado no incluido aún en el catálogo del monitor.
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
