@@ -88,6 +88,7 @@ const ALL_REGS = [
   { n: 66,  title: "Bus rollover strength",              cat: "Seguridad Pasiva" },
   { n: 73,  title: "Lateral protection devices",         cat: "General" },
   { n: 79,  title: "Steering equipment",                 cat: "General" },
+  { n: 80,  title: "Seats of large passenger vehicles",  cat: "Seguridad Pasiva" },
   { n: 83,  title: "Emissions — light vehicles",         cat: "Emisiones" },
   { n: 89,  title: "Speed limiting devices",             cat: "Electrónica" },
   { n: 90,  title: "Replacement brake linings",          cat: "Frenado" },
@@ -1473,7 +1474,6 @@ export default function UneceApp() {
                 {/* Auto-select regulations from scope */}
                 {(() => {
                   const scopeNums = [...extractRegNums(scope.rawText)]
-                    .filter(n => ALL_REGS.some(r => r.n === n))
                     .sort((a, b) => a - b);
                   if (scopeNums.length === 0) return null;
                   const unmonitored = scopeNums.filter(n => !monitored.has(n));
@@ -1502,7 +1502,7 @@ export default function UneceApp() {
                             <button
                               key={n}
                               onClick={() => toggleReg(n)}
-                              title={reg?.title}
+                              title={reg?.title ?? `UN Regulation ${n}`}
                               style={{
                                 fontFamily:T.mono, fontSize:11, padding:"4px 11px", borderRadius:5, cursor:"pointer",
                                 border:`1.5px solid ${isOn ? T.blue : T.border2}`,
@@ -1512,13 +1512,16 @@ export default function UneceApp() {
                                 transition:"all .15s",
                               }}
                             >
-                              {isOn ? "✓ " : ""}{regId(n)}
+                              {isOn ? "✓ " : ""}{regId(n)}{!reg ? " *" : ""}
                             </button>
                           );
                         })}
                       </div>
                       <div style={{ fontSize:10.5, color:T.dim, marginTop:10 }}>
                         Haz clic en cada reglamento para activar o desactivar su vigilancia individualmente.
+                        {scopeNums.some(n => !ALL_REGS.find(r => r.n === n)) && (
+                          <span> · <span style={{ color:T.warn }}>*</span> Reglamento detectado no incluido aún en el catálogo del monitor.</span>
+                        )}
                       </div>
                     </div>
                   );
