@@ -1141,6 +1141,22 @@ export default function UneceApp() {
               </p>
             </div>
 
+            {/* ENAC recommendation banner */}
+            <div style={{ background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:8, padding:"14px 18px", marginBottom:16, display:"flex", gap:12, alignItems:"flex-start" }}>
+              <span style={{ fontSize:20, flexShrink:0 }}>ℹ️</span>
+              <div>
+                <div style={{ fontSize:12.5, fontWeight:700, color:"#1e40af", marginBottom:4 }}>
+                  Usa el PDF oficial del anexo técnico de ENAC
+                </div>
+                <div style={{ fontSize:12, color:"#1d4ed8", lineHeight:1.6 }}>
+                  Para garantizar que el texto sea legible y los reglamentos se detecten correctamente, descarga el alcance directamente desde el{" "}
+                  <strong>buscador de entidades acreditadas de ENAC</strong>{" "}
+                  (enac.es → Entidades acreditadas → busca tu laboratorio → descarga el Anexo Técnico en PDF).
+                  Ese PDF contiene el texto embebido y es compatible con el extractor automático.
+                </div>
+              </div>
+            </div>
+
             {/* Upload card */}
             <div style={{ background:"white", border:`1px solid ${T.border}`, borderRadius:8, padding:28, marginBottom:20, boxShadow:"0 1px 3px rgba(0,0,0,.04)" }}>
               <div style={{ fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.08em", textTransform:"uppercase" as const, marginBottom:16 }}>
