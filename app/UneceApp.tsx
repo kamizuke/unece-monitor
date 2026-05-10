@@ -124,6 +124,7 @@ const MOCK_CHANGES: Change[] = [];
 const SCOPE_STORAGE_KEY    = "unece_accreditation_scope";
 const DEMO_DISMISSED_KEY   = "unece_demo_dismissed";
 const BASELINE_KEY         = "unece_baseline_set";
+const BASELINE_SNAPSHOT_KEY = "unece_baseline_snapshot";
 const ADMIN_TOKEN_KEY      = "unece_admin_token";
 
 const DEMO_CHANGE: Change = {
@@ -152,8 +153,44 @@ interface Change {
   summary: string;
 }
 
+interface VersionEntry {
+  hash?: string;
+  title: string;
+  url?: string;
+  doc_type?: string;
+  detectedAt?: string;
+  first_seen?: string;
+  last_seen?: string;
+}
+
+interface MonitorState {
+  last_check?: string;
+  regulations?: Record<string, {
+    known_hashes?: string[];
+    known_entries?: VersionEntry[];
+  }>;
+}
+
+interface BaselineEntry {
+  reg: number;
+  title: string;
+  hash: string;
+  url?: string;
+  docType?: string;
+  capturedAt: string;
+}
+
+interface BaselineSnapshot {
+  createdAt: string;
+  entries: BaselineEntry[];
+}
+
 function regId(n: number) { return `R${String(n).padStart(3, "0")}`; }
 function fmtDate(ts: string) { return new Date(ts).toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric", timeZone:"Europe/Madrid" }); }
+
+function versionHash(v: { hash?: string; title: string; url?: string }): string {
+  return v.hash || `${v.title}|${v.url ?? ""}`;
+}
 
 async function fetchWithAdminAuth(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
@@ -385,10 +422,12 @@ export default function UneceApp() {
   const [aiLoading, setAiLoading]           = useState(false);
   const [aiReport, setAiReport]             = useState("");
   const [allChanges, setAllChanges]         = useState<Change[]>(MOCK_CHANGES);
+  const [monitorState, setMonitorState]     = useState<MonitorState | null>(null);
   const [loadingData, setLoadingData]       = useState(true);
   const [lastCheck, setLastCheck]           = useState<string | null>(null);
   const [triggering, setTriggering]         = useState(false);
   const [triggerMsg, setTriggerMsg]         = useState<string | null>(null);
+  const [baselineSnapshot, setBaselineSnapshot] = useState<BaselineSnapshot | null>(null);
 
   // ── Review history state ──────────────────────────────────────────────────
   const [reviews, setReviews]               = useState<ReviewRecord[]>([]);
@@ -414,6 +453,58 @@ export default function UneceApp() {
   const [expandedDocType, setExpandedDocType] = useState<string | null>(null);
   const fileInputRef                    = useRef<HTMLInputElement>(null);
 
+  function currentVersionFor(regNum: number): BaselineEntry {
+    const now = new Date().toISOString();
+    const stateEntry = monitorState?.regulations?.[String(regNum)]?.known_entries?.at(-1);
+    if (stateEntry) {
+      return {
+        reg: regNum,
+        title: stateEntry.title,
+        hash: versionHash({ hash: stateEntry.hash, title: stateEntry.title, url: stateEntry.url }),
+        url: stateEntry.url,
+        docType: stateEntry.doc_type,
+        capturedAt: stateEntry.last_seen || stateEntry.first_seen || stateEntry.detectedAt || now,
+      };
+    }
+
+    const latestChange = allChanges
+      .filter(c => c.reg === regNum)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+    if (latestChange) {
+      return {
+        reg: regNum,
+        title: latestChange.title,
+        hash: versionHash({ hash: latestChange.id, title: latestChange.title, url: latestChange.url }),
+        url: latestChange.url,
+        docType: latestChange.doc_type,
+        capturedAt: latestChange.timestamp,
+      };
+    }
+
+    return {
+      reg: regNum,
+      title: "Sin publicación registrada todavía en el monitor",
+      hash: `empty:${regNum}`,
+      capturedAt: lastCheck || now,
+    };
+  }
+
+  function createBaselineSnapshot(createdAt = new Date().toISOString()) {
+    const snapshot: BaselineSnapshot = {
+      createdAt,
+      entries: [...monitored].sort((a, b) => a - b).map(currentVersionFor),
+    };
+    setBaselineSnapshot(snapshot);
+    setBaselineSet(true);
+    localStorage.setItem(BASELINE_KEY, createdAt);
+    localStorage.setItem(BASELINE_SNAPSHOT_KEY, JSON.stringify(snapshot));
+    return snapshot;
+  }
+
+  function baselineFor(regNum: number): BaselineEntry | null {
+    return baselineSnapshot?.entries.find(e => e.reg === regNum) ?? null;
+  }
+
   // ── Load data on mount ────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/changes_log.json?_=" + Date.now())
@@ -426,7 +517,10 @@ export default function UneceApp() {
 
     fetch("/state.json?_=" + Date.now())
       .then(r => r.json())
-      .then((s: { last_check?: string }) => { if (s.last_check) setLastCheck(s.last_check); })
+      .then((s: MonitorState) => {
+        setMonitorState(s);
+        if (s.last_check) setLastCheck(s.last_check);
+      })
       .catch(() => {});
 
     // Load autorun + monitored regulations from config.json
@@ -444,8 +538,18 @@ export default function UneceApp() {
     setShowDemo(!localStorage.getItem(DEMO_DISMISSED_KEY));
 
     // Baseline tracking
-    const bl = !!localStorage.getItem(BASELINE_KEY);
-    setBaselineSet(bl);
+    try {
+      const storedBaseline = localStorage.getItem(BASELINE_SNAPSHOT_KEY);
+      if (storedBaseline) {
+        const parsed = JSON.parse(storedBaseline) as BaselineSnapshot;
+        setBaselineSnapshot(parsed);
+        setBaselineSet(true);
+      } else {
+        setBaselineSet(!!localStorage.getItem(BASELINE_KEY));
+      }
+    } catch {
+      setBaselineSet(!!localStorage.getItem(BASELINE_KEY));
+    }
 
     // Load persisted scope from localStorage
     try {
@@ -610,13 +714,14 @@ export default function UneceApp() {
     setTriggering(true);
     setTriggerMsg(null);
     try {
+      if (!baselineSnapshot && monitored.size > 0) {
+        createBaselineSnapshot();
+      }
       const res = await fetch("/api/trigger", { method: "POST" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error desconocido");
       setLastCheck(new Date().toISOString());
       if (isFirstRun) {
-        localStorage.setItem(BASELINE_KEY, new Date().toISOString());
-        setBaselineSet(true);
         setShowBaselineBanner(true);
       }
       setTriggerMsg("✓ Scraping iniciado — los resultados aparecerán en ~2 min");
@@ -624,7 +729,14 @@ export default function UneceApp() {
       setTimeout(() => {
         fetch("/state.json?_=" + Date.now())
           .then(r => r.json())
-          .then((s: { last_check?: string }) => { if (s.last_check) setLastCheck(s.last_check); })
+          .then((s: MonitorState) => {
+            setMonitorState(s);
+            if (s.last_check) setLastCheck(s.last_check);
+          })
+          .catch(() => {});
+        fetch("/changes_log.json?_=" + Date.now())
+          .then(r => r.json())
+          .then((data: Change[]) => { if (Array.isArray(data)) setAllChanges(data); })
           .catch(() => {});
       }, 150_000); // 2.5 min
     } catch (e: unknown) {
@@ -697,6 +809,16 @@ export default function UneceApp() {
       && (catFilter === "Todos" || r.cat === catFilter);
   });
 
+  const versionRows = [...monitored].sort((a, b) => a - b).map(n => {
+    const reg = ALL_REGS.find(r => r.n === n);
+    const baseline = baselineFor(n);
+    const current = currentVersionFor(n);
+    const changed = !!baseline && versionHash(baseline) !== versionHash(current);
+    return { reg: n, title: reg?.title ?? `Regulation ${n}`, baseline, current, changed };
+  });
+  const baselineChangedCount = versionRows.filter(r => r.changed).length;
+  const baselineKnownCount = versionRows.filter(r => r.baseline).length;
+
   return (
     <div style={{ fontFamily:T.sans, background:T.bg, minHeight:"100vh", color:T.text }}>
       <style>{`
@@ -720,6 +842,7 @@ export default function UneceApp() {
         .dashboard-grid{display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start}
         .change-card-inner{display:flex}
         .change-card-action{display:flex;align-items:center;padding:0 16px;border-left:1px solid ${T.border};background:${T.bg}}
+        .baseline-version-row{display:grid;grid-template-columns:92px 1fr 1fr 132px;gap:12px;align-items:center}
 
         @media(max-width:900px){
           .dashboard-grid{grid-template-columns:1fr!important}
@@ -732,6 +855,7 @@ export default function UneceApp() {
           .app-content{padding:12px 14px!important}
           .change-card-inner{flex-direction:column!important}
           .change-card-action{border-left:none!important;border-top:1px solid ${T.border}!important;padding:10px 14px!important;justify-content:flex-end}
+          .baseline-version-row{grid-template-columns:1fr!important;gap:8px!important}
           .reg-grid{grid-template-columns:1fr 1fr!important}
           .selector-grid{grid-template-columns:1fr!important}
         }
@@ -903,6 +1027,75 @@ export default function UneceApp() {
                   <button onClick={() => setShowBaselineBanner(false)} style={{ background:"none", border:"none", cursor:"pointer", color:"#16a34a", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }} title="Cerrar">✕</button>
                 </div>
               )}
+
+              {/* Baseline vs current version */}
+              <section style={{ background:"white", border:`1px solid ${baselineChangedCount > 0 ? "#fdba74" : T.border}`, borderRadius:8, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.04)" }}>
+                <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", gap:12, alignItems:"center", flexWrap:"wrap" as const }}>
+                  <div>
+                    <h2 style={{ fontFamily:T.sans, fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.1em", textTransform:"uppercase" as const, margin:"0 0 4px" }}>
+                      Estado frente a baseline
+                    </h2>
+                    <div style={{ fontSize:12, color:T.body, lineHeight:1.45 }}>
+                      {baselineSnapshot
+                        ? <>Baseline guardada el {new Date(baselineSnapshot.createdAt).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })}. Cada revisión compara la versión actual contra esta foto.</>
+                        : "Guarda una baseline para que cada revisión muestre si la versión detectada sigue siendo la misma."}
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" as const }}>
+                    {baselineSnapshot && (
+                      <span style={{ fontFamily:T.mono, fontSize:11, fontWeight:700, color:baselineChangedCount > 0 ? "#c2410c" : T.ok, background:baselineChangedCount > 0 ? "#fff7ed" : T.okBg, border:`1px solid ${baselineChangedCount > 0 ? "#fdba74" : "#bbf7d0"}`, borderRadius:4, padding:"5px 9px" }}>
+                        {baselineChangedCount > 0 ? `${baselineChangedCount} con nueva versión` : "Todo igual que baseline"}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => createBaselineSnapshot()}
+                      disabled={monitored.size === 0}
+                      style={{ background:T.blue, color:"white", border:"none", borderRadius:5, padding:"7px 12px", fontSize:11.5, fontWeight:700, cursor:monitored.size === 0 ? "not-allowed" : "pointer", opacity:monitored.size === 0 ? .55 : 1, fontFamily:T.sans }}
+                    >
+                      {baselineSnapshot ? "Actualizar baseline" : "Guardar baseline actual"}
+                    </button>
+                  </div>
+                </div>
+
+                {monitored.size === 0 ? (
+                  <div style={{ padding:18, fontSize:12, color:T.muted }}>Selecciona reglamentos para poder crear una baseline.</div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column" }}>
+                    {versionRows.map(row => {
+                      const statusColor = !row.baseline ? T.warn : row.changed ? "#c2410c" : T.ok;
+                      const statusBg = !row.baseline ? T.warnBg : row.changed ? "#fff7ed" : T.okBg;
+                      const statusLabel = !row.baseline ? "Sin baseline" : row.changed ? "Nueva versión" : "Misma versión";
+                      return (
+                        <div key={row.reg} className="baseline-version-row" style={{ padding:"12px 18px", borderTop:`1px solid ${T.border}` }}>
+                          <div>
+                            <div style={{ fontFamily:T.mono, fontWeight:800, fontSize:14, color:T.blueDeep }}>{regId(row.reg)}</div>
+                            <div style={{ fontSize:10, color:T.dim, marginTop:2 }}>{row.title}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Baseline</div>
+                            <div style={{ fontSize:11.5, color:row.baseline ? T.body : T.dim, lineHeight:1.35 }}>
+                              {row.baseline?.title ?? "Pendiente de guardar"}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Actual</div>
+                            <div style={{ fontSize:11.5, color:T.body, lineHeight:1.35 }}>{row.current.title}</div>
+                            <div style={{ fontSize:10, color:T.dim, marginTop:3 }}>
+                              {new Date(row.current.capturedAt).toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric", timeZone:"Europe/Madrid" })}
+                            </div>
+                          </div>
+                          <div style={{ justifySelf:"end" }}>
+                            <span style={{ display:"inline-flex", alignItems:"center", gap:6, borderRadius:20, padding:"4px 10px", fontSize:11, fontWeight:700, color:statusColor, background:statusBg, border:`1px solid ${statusColor}35`, whiteSpace:"nowrap" as const }}>
+                              <span style={{ width:6, height:6, borderRadius:"50%", background:statusColor }} />
+                              {statusLabel}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
 
               {/* Monitored regs grid */}
               <section>

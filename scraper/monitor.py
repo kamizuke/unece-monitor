@@ -89,25 +89,43 @@ def detect_changes(found: list[dict], state: dict) -> tuple[list[dict], dict]:
     """Compare found documents against state, return new/changed items."""
     new_changes = []
     reg_state = state.get("regulations", {})
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "")
 
     for entry in found:
         key = str(entry["reg"])
-        known = reg_state.get(key, {}).get("known_hashes", [])
+        if key not in reg_state:
+            reg_state[key] = {"known_hashes": [], "known_entries": []}
+
+        known = reg_state[key].get("known_hashes", [])
+        known_entries = reg_state[key].get("known_entries", [])
         h = hash_entry(entry["title"], entry["url"])
+
         if h not in known:
             entry["id"] = f"c{h}"
             entry["change_type"] = "NUEVO_DOCUMENTO"
-            entry["timestamp"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "")
+            entry["timestamp"] = now
             entry["has_prev"] = bool(known)
             entry["summary"] = f"Nuevo documento detectado: {entry['title'][:120]}"
             new_changes.append(entry)
-            # Update state
-            if key not in reg_state:
-                reg_state[key] = {"known_hashes": []}
             reg_state[key]["known_hashes"].append(h)
+            known_entries.append({
+                "hash": h,
+                "title": entry["title"],
+                "url": entry["url"],
+                "doc_type": entry.get("doc_type", "DOCUMENT"),
+                "first_seen": now,
+                "last_seen": now,
+            })
+        else:
+            for known_entry in known_entries:
+                if known_entry.get("hash") == h:
+                    known_entry["last_seen"] = now
+                    break
+
+        reg_state[key]["known_entries"] = known_entries[-50:]
 
     state["regulations"] = reg_state
-    state["last_check"] = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "")
+    state["last_check"] = now
     return new_changes, state
 
 
