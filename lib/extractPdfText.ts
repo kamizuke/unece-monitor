@@ -35,15 +35,14 @@ export async function extractPdfText(file: File): Promise<{ text: string; pageCo
 // This avoids the "false endstream" problem with binary compressed data.
 
 async function extractStreamsViaLength(raw: string, out: string[]): Promise<void> {
-  // Match dict << ... >> stream\n  allowing up to 2000 chars for the dict
   const re = /<<([\s\S]{1,2000}?)>>\s*stream\r?\n/g;
+  const tasks: Promise<string[]>[] = [];
   let m: RegExpExecArray | null;
 
   while ((m = re.exec(raw)) !== null) {
     const dict      = m[1];
     const dataStart = m.index + m[0].length;
 
-    // Only use direct integer length — skip indirect refs like "/Length 5 0 R"
     const lenMatch = dict.match(/\/Length\s+(\d+)(?!\s+\d+\s*R\b)/);
     if (!lenMatch) continue;
 
@@ -51,32 +50,39 @@ async function extractStreamsViaLength(raw: string, out: string[]): Promise<void
     if (length <= 0 || dataStart + length > raw.length) continue;
 
     const content = raw.slice(dataStart, dataStart + length);
-    await processStream(dict, content, out);
+    tasks.push(processStream(dict, content));
   }
+
+  const results = await Promise.all(tasks);
+  for (const r of results) out.push(...r);
 }
 
 // ── Strategy 2: regex-based stream extraction (fallback) ─────────────────────
 
 async function extractStreamsFallback(raw: string, out: string[]): Promise<void> {
   const re = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  const tasks: Promise<string[]>[] = [];
   let m: RegExpExecArray | null;
 
   while ((m = re.exec(raw)) !== null) {
-    const content   = m[1];
+    const content     = m[1];
     const headerChunk = raw.slice(Math.max(0, m.index - 800), m.index);
-    await processStream(headerChunk, content, out);
+    tasks.push(processStream(headerChunk, content));
   }
+
+  const results = await Promise.all(tasks);
+  for (const r of results) out.push(...r);
 }
 
 // ── Shared stream processor ───────────────────────────────────────────────────
 
-async function processStream(dictOrHeader: string, content: string, out: string[]): Promise<void> {
+async function processStream(dictOrHeader: string, content: string): Promise<string[]> {
+  const out: string[] = [];
   const isFlate   = /\/Filter\s*(?:\/FlateDecode|\[[\s\S]{0,60}\/FlateDecode[\s\S]{0,60}\])/.test(dictOrHeader);
   const isAscii85 = /\/Filter\s*(?:\/ASCII85Decode|\[[\s\S]{0,60}\/ASCII85Decode[\s\S]{0,60}\])/.test(dictOrHeader);
   const isHex     = /\/Filter\s*(?:\/ASCIIHexDecode|\[[\s\S]{0,60}\/ASCIIHexDecode[\s\S]{0,60}\])/.test(dictOrHeader);
 
   if (isFlate) {
-    // Try both zlib (with header) and raw deflate
     const decomp = await tryDecompress(content);
     if (decomp) extractBtEt(decomp, out);
   } else if (isAscii85) {
@@ -88,6 +94,8 @@ async function processStream(dictOrHeader: string, content: string, out: string[
   } else {
     extractBtEt(content, out);
   }
+
+  return out;
 }
 
 // ── Decompression ─────────────────────────────────────────────────────────────
