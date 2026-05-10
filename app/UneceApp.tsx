@@ -120,6 +120,7 @@ const DOC_CFG: Record<string, { color: string; bg: string; label: string; short:
 const MOCK_CHANGES: Change[] = [];
 const SCOPE_STORAGE_KEY    = "unece_accreditation_scope";
 const DEMO_DISMISSED_KEY   = "unece_demo_dismissed";
+const BASELINE_KEY         = "unece_baseline_set";
 
 const DEMO_CHANGE: Change = {
   id: "c1",
@@ -348,6 +349,8 @@ function ScopeMatchRow({ match }: { match: ScopeMatch }) {
 export default function UneceApp() {
   const [monitored, setMonitored]           = useState(new Set<number>());
   const [showDemo, setShowDemo]             = useState(false);
+  const [baselineSet, setBaselineSet]       = useState(false);
+  const [showBaselineBanner, setShowBaselineBanner] = useState(false);
   const [view, setView]                     = useState("dashboard");
   const [search, setSearch]                 = useState("");
   const [catFilter, setCatFilter]           = useState("Todos");
@@ -405,6 +408,10 @@ export default function UneceApp() {
 
     // Show demo card unless user already dismissed it
     setShowDemo(!localStorage.getItem(DEMO_DISMISSED_KEY));
+
+    // Baseline tracking
+    const bl = !!localStorage.getItem(BASELINE_KEY);
+    setBaselineSet(bl);
 
     // Load persisted scope from localStorage
     try {
@@ -565,6 +572,7 @@ export default function UneceApp() {
 
   // ── Scraper trigger ───────────────────────────────────────────────────────
   async function triggerScraper() {
+    const isFirstRun = !lastCheck && !baselineSet;
     setTriggering(true);
     setTriggerMsg(null);
     try {
@@ -572,6 +580,11 @@ export default function UneceApp() {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Error desconocido");
       setLastCheck(new Date().toISOString());
+      if (isFirstRun) {
+        localStorage.setItem(BASELINE_KEY, new Date().toISOString());
+        setBaselineSet(true);
+        setShowBaselineBanner(true);
+      }
       setTriggerMsg("✓ Scraping iniciado — los resultados aparecerán en ~2 min");
       // Re-fetch state after scraper likely finishes
       setTimeout(() => {
@@ -729,6 +742,11 @@ export default function UneceApp() {
                 <>▶ Realizar revisión ahora</>
               )}
             </button>
+            {!baselineSet && !lastCheck && !triggering && (
+              <div style={{ fontSize:9.5, color:"rgba(255,255,255,.55)", textAlign:"center" as const, maxWidth:140, lineHeight:1.4 }}>
+                Primera ejecución: establece la línea base
+              </div>
+            )}
             {triggerMsg && (
               <div style={{
                 position:"absolute", marginTop:52,
@@ -817,6 +835,20 @@ export default function UneceApp() {
         {view === "dashboard" && (
           <div className="dashboard-grid" style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:24, alignItems:"start" }}>
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+
+              {/* Baseline established banner */}
+              {showBaselineBanner && (
+                <div style={{ background:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:8, padding:"14px 18px", display:"flex", gap:14, alignItems:"flex-start", animation:"fadeUp .3s ease" }}>
+                  <span style={{ fontSize:22, lineHeight:1 }}>📍</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:700, fontSize:13, color:"#166534", marginBottom:3 }}>Línea base establecida</div>
+                    <div style={{ fontSize:12, color:"#15803d", lineHeight:1.5 }}>
+                      Esta primera revisión captura el estado actual de los reglamentos seleccionados. No se esperan cambios detectados todavía — a partir de ahora el monitor comparará cada nueva revisión con esta foto inicial y alertará cuando aparezcan modificaciones.
+                    </div>
+                  </div>
+                  <button onClick={() => setShowBaselineBanner(false)} style={{ background:"none", border:"none", cursor:"pointer", color:"#16a34a", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }} title="Cerrar">✕</button>
+                </div>
+              )}
 
               {/* Monitored regs grid */}
               <section>
