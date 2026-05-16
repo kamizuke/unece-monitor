@@ -204,6 +204,46 @@ function versionHash(v: { hash?: string; title: string; url?: string }): string 
   return v.hash || `${v.title}|${v.url ?? ""}`;
 }
 
+function versionLabel(v: BaselineEntry | null | undefined): string {
+  if (!v || v.title.startsWith("Sin publicación registrada")) return "Sin versión detectada";
+
+  const parts = [
+    v.title.match(/\bRev(?:ision)?\.?\s*\d+(?:\s*\([^)]+\))?/i)?.[0],
+    v.title.match(/\b\d{1,2}\s*series\b/i)?.[0],
+    v.title.match(/\bAmendment\s*\d+/i)?.[0],
+    v.title.match(/\bSupplement\s*\d+/i)?.[0],
+    v.title.match(/\bCorrigendum\s*\d+/i)?.[0],
+    v.title.match(/\bAddendum\s*\d+/i)?.[0],
+  ].filter(Boolean);
+
+  if (parts.length > 0) return [...new Set(parts)].join(" · ");
+  return v.docType || "Documento detectado";
+}
+
+function scopeEvidenceForReg(scope: AccreditationScope | null, reg: number): string[] {
+  if (!scope) return [];
+
+  const evidence = new Set<string>();
+  for (const ref of scope.extractedReferences) {
+    if (extractRegNums(ref).has(reg)) evidence.add(ref);
+  }
+
+  const lineRe = new RegExp(
+    `(?:UN\\s+R\\.?\\s*${reg}\\b|UNECE\\s+R\\.?\\s*${reg}\\b|UN\\s+Regulation\\s+(?:No\\.?\\s*)?${reg}\\b|Regulation\\s+(?:No\\.?\\s*)?${reg}\\b|CEPE\\/ONU\\s+(?:N[º°o]?\\.?\\s*)?${reg}\\b|ECE\\s+(?:REGULATION\\s+)?N[º°o]?\\.?\\s*${reg}\\b)`,
+    "i"
+  );
+
+  for (const rawLine of scope.rawText.split(/\n+/)) {
+    const line = rawLine.trim().replace(/\s+/g, " ");
+    if (line.length >= 5 && line.length <= 220 && lineRe.test(line)) {
+      evidence.add(line);
+    }
+    if (evidence.size >= 4) break;
+  }
+
+  return Array.from(evidence).slice(0, 4);
+}
+
 async function fetchWithAdminAuth(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   const storedToken = localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -846,7 +886,8 @@ export default function UneceApp() {
     const baseline = baselineFor(n);
     const current = currentVersionFor(n);
     const changed = !!baseline && versionHash(baseline) !== versionHash(current);
-    return { reg: n, title: reg?.title ?? `Regulation ${n}`, baseline, current, changed };
+    const scopeEvidence = scopeEvidenceForReg(scope, n);
+    return { reg: n, title: reg?.title ?? `Regulation ${n}`, baseline, current, changed, scopeEvidence };
   });
   const baselineChangedCount = versionRows.filter(r => r.changed).length;
   const baselineKnownCount = versionRows.filter(r => r.baseline).length;
@@ -874,7 +915,7 @@ export default function UneceApp() {
         .dashboard-grid{display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start}
         .change-card-inner{display:flex}
         .change-card-action{display:flex;align-items:center;padding:0 16px;border-left:1px solid ${T.border};background:${T.bg}}
-        .baseline-version-row{display:grid;grid-template-columns:92px 1fr 1fr 132px;gap:12px;align-items:center}
+        .baseline-version-row{display:grid;grid-template-columns:92px 1fr 1fr 132px;gap:12px;align-items:start}
 
         @media(max-width:900px){
           .dashboard-grid{grid-template-columns:1fr!important}
@@ -888,6 +929,7 @@ export default function UneceApp() {
           .change-card-inner{flex-direction:column!important}
           .change-card-action{border-left:none!important;border-top:1px solid ${T.border}!important;padding:10px 14px!important;justify-content:flex-end}
           .baseline-version-row{grid-template-columns:1fr!important;gap:8px!important}
+          .scope-version-evidence{grid-column:auto!important}
           .reg-grid{grid-template-columns:1fr 1fr!important}
           .selector-grid{grid-template-columns:1fr!important}
         }
@@ -1107,12 +1149,18 @@ export default function UneceApp() {
                           </div>
                           <div>
                             <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Estado guardado</div>
+                            <div style={{ fontFamily:T.mono, fontSize:10.5, color:row.baseline ? T.blueDeep : T.dim, fontWeight:700, marginBottom:4 }}>
+                              {versionLabel(row.baseline)}
+                            </div>
                             <div style={{ fontSize:11.5, color:row.baseline ? T.body : T.dim, lineHeight:1.35 }}>
                               {row.baseline?.title ?? "Pendiente de guardar"}
                             </div>
                           </div>
                           <div>
-                            <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Actual</div>
+                            <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Detectado en revisión</div>
+                            <div style={{ fontFamily:T.mono, fontSize:10.5, color:T.blueDeep, fontWeight:700, marginBottom:4 }}>
+                              {versionLabel(row.current)}
+                            </div>
                             <div style={{ fontSize:11.5, color:T.body, lineHeight:1.35 }}>{row.current.title}</div>
                             <div style={{ fontSize:10, color:T.dim, marginTop:3 }}>
                               {new Date(row.current.capturedAt).toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric", timeZone:"Europe/Madrid" })}
@@ -1123,6 +1171,24 @@ export default function UneceApp() {
                               <span style={{ width:6, height:6, borderRadius:"50%", background:statusColor }} />
                               {statusLabel}
                             </span>
+                          </div>
+                          <div className="scope-version-evidence" style={{ gridColumn:"2 / 5", borderTop:`1px dashed ${T.border}`, paddingTop:9 }}>
+                            <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:6 }}>
+                              Referencias encontradas en el archivo de alcance
+                            </div>
+                            {row.scopeEvidence.length > 0 ? (
+                              <div style={{ display:"flex", flexWrap:"wrap" as const, gap:5 }}>
+                                {row.scopeEvidence.map((item, i) => (
+                                  <span key={i} style={{ fontFamily:T.mono, fontSize:10, color:T.body, background:T.bg, border:`1px solid ${T.border}`, borderRadius:4, padding:"3px 7px", lineHeight:1.35 }}>
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize:11, color:T.dim }}>
+                                No hay archivo de alcance cargado o no se ha encontrado una referencia explícita para {regId(row.reg)}.
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
