@@ -747,7 +747,7 @@ export default function UneceApp() {
       if (isFirstRun) {
         setShowBaselineBanner(true);
       }
-      setTriggerMsg("✓ Scraping iniciado — los resultados aparecerán en ~2 min");
+      setTriggerMsg("✓ Realizando la revisión de los reglamentos — los resultados aparecerán en ~2 min");
       // Re-fetch state after scraper likely finishes
       setTimeout(() => {
         fetch("/state.json?_=" + Date.now())

@@ -81,7 +81,7 @@ export default function Dashboard({ changes, onAnalyze, analyzing }: DashboardPr
         <div className="flex flex-col items-center justify-center py-16 text-[#b1aba3]">
           <CheckCircle size={48} className="mb-3 opacity-40" />
           <p className="text-lg font-medium">Sin cambios detectados</p>
-          <p className="text-sm mt-1">El próximo scraping es a las 07:00 UTC</p>
+          <p className="text-sm mt-1">La próxima revisión de reglamentos es a las 07:00 UTC</p>
         </div>
       ) : (
         <div className="space-y-3">
