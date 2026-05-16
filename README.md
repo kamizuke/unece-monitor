@@ -41,4 +41,6 @@ npx tsc --noEmit
 
 Actualmente la configuración y los cambios publicados se leen desde `public/config.json`, `public/state.json` y `public/changes_log.json`. Esto es suficiente para una demo o una instalación controlada, pero para uso formal en auditoría conviene migrarlo a una base de datos con usuarios, roles y trazabilidad inmutable.
 
-El scraper está en `scraper/monitor.py` y actualiza el estado comparando documentos detectados con hashes conocidos. Para producción conviene ampliar la fuente UNECE, guardar hash de PDF, fecha de publicación, versión/serie y evidencia descargada.
+El scraper está en `scraper/monitor.py` y actualiza el estado comparando documentos detectados con hashes conocidos. Cada ejecución escribe `public/run_status.json` con resultado, hora de inicio/fin, reglamentos vigilados, documentos encontrados y número real de cambios detectados en esa ejecución. Esto permite demostrar que el monitor ha funcionado aunque `new_changes` sea `0`.
+
+Para producción conviene ampliar la fuente UNECE, guardar hash de PDF, fecha de publicación, versión/serie y evidencia descargada.

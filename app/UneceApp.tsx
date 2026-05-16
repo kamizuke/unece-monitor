@@ -171,6 +171,18 @@ interface MonitorState {
   }>;
 }
 
+interface MonitorRunStatus {
+  status?: "success" | "failed" | "unknown";
+  started_at?: string | null;
+  finished_at?: string | null;
+  last_success?: string | null;
+  regulations?: number[];
+  documents_found?: number;
+  new_changes?: number;
+  state_last_check?: string | null;
+  error?: string;
+}
+
 interface BaselineEntry {
   reg: number;
   title: string;
@@ -423,6 +435,7 @@ export default function UneceApp() {
   const [aiReport, setAiReport]             = useState("");
   const [allChanges, setAllChanges]         = useState<Change[]>(MOCK_CHANGES);
   const [monitorState, setMonitorState]     = useState<MonitorState | null>(null);
+  const [runStatus, setRunStatus]           = useState<MonitorRunStatus | null>(null);
   const [loadingData, setLoadingData]       = useState(true);
   const [lastCheck, setLastCheck]           = useState<string | null>(null);
   const [triggering, setTriggering]         = useState(false);
@@ -520,6 +533,16 @@ export default function UneceApp() {
       .then((s: MonitorState) => {
         setMonitorState(s);
         if (s.last_check) setLastCheck(s.last_check);
+      })
+      .catch(() => {});
+
+    fetch("/run_status.json?_=" + Date.now())
+      .then(r => r.json())
+      .then((status: MonitorRunStatus) => {
+        setRunStatus(status);
+        if (status.last_success || status.state_last_check) {
+          setLastCheck(status.last_success || status.state_last_check || null);
+        }
       })
       .catch(() => {});
 
@@ -734,6 +757,15 @@ export default function UneceApp() {
             if (s.last_check) setLastCheck(s.last_check);
           })
           .catch(() => {});
+        fetch("/run_status.json?_=" + Date.now())
+          .then(r => r.json())
+          .then((status: MonitorRunStatus) => {
+            setRunStatus(status);
+            if (status.last_success || status.state_last_check) {
+              setLastCheck(status.last_success || status.state_last_check || null);
+            }
+          })
+          .catch(() => {});
         fetch("/changes_log.json?_=" + Date.now())
           .then(r => r.json())
           .then((data: Change[]) => { if (Array.isArray(data)) setAllChanges(data); })
@@ -892,7 +924,9 @@ export default function UneceApp() {
 
           {/* Última revisión */}
           <div className="header-last-check" style={{ textAlign:"right" as const }}>
-            <div style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>ÚLTIMA REVISIÓN</div>
+            <div style={{ fontSize:10, opacity:.5, letterSpacing:"0.04em" }}>
+              {runStatus?.status === "failed" ? "ÚLTIMA REVISIÓN FALLIDA" : "ÚLTIMA REVISIÓN"}
+            </div>
             <div style={{ fontFamily:T.mono, fontSize:11, opacity:.85 }}>
               {lastCheck
                 ? new Date(lastCheck).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })
@@ -1328,9 +1362,15 @@ export default function UneceApp() {
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
                   <div>
                     <div style={{ fontFamily:T.mono, fontSize:12, color: autorun === false ? "#92400e" : T.blueDeep, fontWeight:700 }}>
-                      {autorun === null ? "Cargando…" : autorun ? "Mañana 09:00 CET" : "⏸ Pausada"}
+                      {runStatus?.status === "failed" ? "Última ejecución fallida" : autorun === null ? "Cargando…" : autorun ? "Mañana 09:00 CET" : "⏸ Pausada"}
                     </div>
-                    <div style={{ fontSize:11, color: autorun === false ? "#b45309" : T.blueMid, marginTop:3 }}>GitHub Actions · cron diario</div>
+                    <div style={{ fontSize:11, color: runStatus?.status === "failed" ? "#b91c1c" : autorun === false ? "#b45309" : T.blueMid, marginTop:3 }}>
+                      {runStatus?.status === "success"
+                        ? `${runStatus.documents_found ?? 0} documentos · ${runStatus.new_changes ?? 0} cambios`
+                        : runStatus?.status === "failed"
+                          ? (runStatus.error || "Revisar logs de GitHub Actions")
+                          : "GitHub Actions · cron diario"}
+                    </div>
                   </div>
                   <button
                     onClick={toggleAutorun}

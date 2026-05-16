@@ -55,17 +55,32 @@ jobs:
       - name: Run UNECE scraper
         id: scraper
         run: |
+          set +e
           python scraper/monitor.py
-          echo "new_changes=$(python -c "import json,pathlib; log=json.loads(pathlib.Path('public/changes_log.json').read_text()); print(len([x for x in log[:5] if 'Nuevo documento' in x.get('summary','') or x.get('change_type')=='NUEVO_DOCUMENTO']))")" >> $GITHUB_OUTPUT
+          scraper_exit=$?
+          new_changes=$(python - <<'PY'
+          import json
+          import pathlib
+
+          path = pathlib.Path("public/run_status.json")
+          if path.exists():
+              status = json.loads(path.read_text())
+              print(status.get("new_changes", 0))
+          else:
+              print(0)
+          PY
+          )
+          echo "new_changes=${new_changes}" >> "$GITHUB_OUTPUT"
+          echo "scraper_exit=${scraper_exit}" >> "$GITHUB_OUTPUT"
 
       - name: Run AI analysis (if changes detected)
-        if: steps.scraper.outputs.new_changes != '0'
+        if: steps.scraper.outputs.scraper_exit == '0' && steps.scraper.outputs.new_changes != '0'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python scraper/comparator.py
 
       - name: Send email notifications (if changes detected)
-        if: steps.scraper.outputs.new_changes != '0'
+        if: steps.scraper.outputs.scraper_exit == '0' && steps.scraper.outputs.new_changes != '0'
         env:
           EMAIL_USERNAME: ${{ secrets.EMAIL_USERNAME }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
@@ -75,10 +90,14 @@ jobs:
         run: |
           git config user.name "UNECE Monitor Bot"
           git config user.email "bot@unece-monitor.noreply"
-          git add public/changes_log.json public/state.json
+          git add public/changes_log.json public/state.json public/run_status.json
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
             git commit -m "chore: update changes_log and state [$(date -u '+%Y-%m-%d %H:%M UTC')]"
             git push
           fi
+
+      - name: Fail workflow if scraper failed
+        if: steps.scraper.outputs.scraper_exit != '0'
+        run: exit 1

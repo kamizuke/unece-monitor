@@ -11,12 +11,11 @@ import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
-
 BASE_URL = "https://unece.org/transport/vehicle-regulations-wp29/standards/addenda-1958-agreement-regulations-0-20"
 ROOT = Path(__file__).parent.parent
 STATE_FILE  = ROOT / "public" / "state.json"
 LOG_FILE    = ROOT / "public" / "changes_log.json"
+RUN_STATUS_FILE = ROOT / "public" / "run_status.json"
 CONFIG_FILE = ROOT / "public" / "config.json"   # shared with the UI
 EMAIL_CFG   = Path(__file__).parent / "config.json"  # email-only local config
 PDF_DIR     = Path(__file__).parent / "pdfs"
@@ -33,6 +32,10 @@ def load_json(path: Path, default):
 def save_json(path: Path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "")
 
 
 def doc_type_from_title(title: str) -> str:
@@ -89,7 +92,7 @@ def detect_changes(found: list[dict], state: dict) -> tuple[list[dict], dict]:
     """Compare found documents against state, return new/changed items."""
     new_changes = []
     reg_state = state.get("regulations", {})
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "")
+    now = utc_now()
 
     for entry in found:
         key = str(entry["reg"])
@@ -142,6 +145,10 @@ def update_log(new_changes: list[dict]):
         print("[monitor] No new changes.")
 
 
+def save_run_status(status: dict):
+    save_json(RUN_STATUS_FILE, status)
+
+
 def download_pdfs(changes: list[dict]):
     for change in changes:
         if not change.get("has_pdf") or not change.get("url", "").lower().endswith(".pdf"):
@@ -163,6 +170,9 @@ def download_pdfs(changes: list[dict]):
 
 
 def main():
+    from playwright.sync_api import sync_playwright
+
+    started_at = utc_now()
     config = load_json(CONFIG_FILE, {"regulations": [17, 48, 100, 155]})
     regs = config.get("regulations", [17, 48, 100, 155])
     if not regs:
@@ -190,9 +200,33 @@ def main():
     update_log(new_changes)
     download_pdfs(new_changes)
 
+    finished_at = utc_now()
+    save_run_status({
+        "status": "success",
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "last_success": finished_at,
+        "source_url": BASE_URL,
+        "regulations": regs,
+        "documents_found": len(found),
+        "new_changes": len(new_changes),
+        "change_ids": [change["id"] for change in new_changes],
+        "state_last_check": updated_state.get("last_check"),
+    })
+
     print("[monitor] Done.")
     return len(new_changes)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        save_run_status({
+            "status": "failed",
+            "started_at": utc_now(),
+            "finished_at": utc_now(),
+            "error": str(exc),
+            "source_url": BASE_URL,
+        })
+        raise
