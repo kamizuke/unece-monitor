@@ -956,7 +956,7 @@ export default function UneceApp() {
             </button>
             {!baselineSet && !lastCheck && !triggering && (
               <div style={{ fontSize:9.5, color:"rgba(255,255,255,.55)", textAlign:"center" as const, maxWidth:140, lineHeight:1.4 }}>
-                Primera ejecución: establece la línea base
+                Primera ejecución: guarda el estado inicial
               </div>
             )}
             {triggerMsg && (
@@ -1048,37 +1048,37 @@ export default function UneceApp() {
           <div className="dashboard-grid" style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:24, alignItems:"start" }}>
             <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
 
-              {/* Baseline established banner */}
+              {/* Review state established banner */}
               {showBaselineBanner && (
                 <div style={{ background:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:8, padding:"14px 18px", display:"flex", gap:14, alignItems:"flex-start", animation:"fadeUp .3s ease" }}>
                   <span style={{ fontSize:22, lineHeight:1 }}>📍</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:700, fontSize:13, color:"#166534", marginBottom:3 }}>Línea base establecida</div>
+                    <div style={{ fontWeight:700, fontSize:13, color:"#166534", marginBottom:3 }}>Estado desde la última revisión guardado</div>
                     <div style={{ fontSize:12, color:"#15803d", lineHeight:1.5 }}>
-                      Esta primera revisión captura el estado actual de los reglamentos seleccionados. No se esperan cambios detectados todavía — a partir de ahora el monitor comparará cada nueva revisión con esta foto inicial y alertará cuando aparezcan modificaciones.
+                      Esta primera revisión captura el estado actual de los reglamentos seleccionados. No se esperan cambios detectados todavía — a partir de ahora el monitor comparará cada nueva revisión con el estado desde la última revisión y alertará cuando aparezcan modificaciones.
                     </div>
                   </div>
                   <button onClick={() => setShowBaselineBanner(false)} style={{ background:"none", border:"none", cursor:"pointer", color:"#16a34a", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }} title="Cerrar">✕</button>
                 </div>
               )}
 
-              {/* Baseline vs current version */}
+              {/* Saved review state vs current version */}
               <section style={{ background:"white", border:`1px solid ${baselineChangedCount > 0 ? "#fdba74" : T.border}`, borderRadius:8, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.04)" }}>
                 <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", gap:12, alignItems:"center", flexWrap:"wrap" as const }}>
                   <div>
                     <h2 style={{ fontFamily:T.sans, fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.1em", textTransform:"uppercase" as const, margin:"0 0 4px" }}>
-                      Estado frente a baseline
+                      Estado desde la última revisión
                     </h2>
                     <div style={{ fontSize:12, color:T.body, lineHeight:1.45 }}>
                       {baselineSnapshot
-                        ? <>Baseline guardada el {new Date(baselineSnapshot.createdAt).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })}. Cada revisión compara la versión actual contra esta foto.</>
-                        : "Guarda una baseline para que cada revisión muestre si la versión detectada sigue siendo la misma."}
+                        ? <>Estado guardado el {new Date(baselineSnapshot.createdAt).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })}. Cada revisión compara la versión actual contra ese estado.</>
+                        : "Guarda el estado actual para que cada revisión muestre si la versión detectada sigue siendo la misma."}
                     </div>
                   </div>
                   <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" as const }}>
                     {baselineSnapshot && (
                       <span style={{ fontFamily:T.mono, fontSize:11, fontWeight:700, color:baselineChangedCount > 0 ? "#c2410c" : T.ok, background:baselineChangedCount > 0 ? "#fff7ed" : T.okBg, border:`1px solid ${baselineChangedCount > 0 ? "#fdba74" : "#bbf7d0"}`, borderRadius:4, padding:"5px 9px" }}>
-                        {baselineChangedCount > 0 ? `${baselineChangedCount} con nueva versión` : "Todo igual que baseline"}
+                        {baselineChangedCount > 0 ? `${baselineChangedCount} con nueva versión` : "Todo igual que la última revisión"}
                       </span>
                     )}
                     <button
@@ -1086,19 +1086,19 @@ export default function UneceApp() {
                       disabled={monitored.size === 0}
                       style={{ background:T.blue, color:"white", border:"none", borderRadius:5, padding:"7px 12px", fontSize:11.5, fontWeight:700, cursor:monitored.size === 0 ? "not-allowed" : "pointer", opacity:monitored.size === 0 ? .55 : 1, fontFamily:T.sans }}
                     >
-                      {baselineSnapshot ? "Actualizar baseline" : "Guardar baseline actual"}
+                      {baselineSnapshot ? "Actualizar estado" : "Guardar estado actual"}
                     </button>
                   </div>
                 </div>
 
                 {monitored.size === 0 ? (
-                  <div style={{ padding:18, fontSize:12, color:T.muted }}>Selecciona reglamentos para poder crear una baseline.</div>
+                  <div style={{ padding:18, fontSize:12, color:T.muted }}>Selecciona reglamentos para poder guardar el estado actual.</div>
                 ) : (
                   <div style={{ display:"flex", flexDirection:"column" }}>
                     {versionRows.map(row => {
                       const statusColor = !row.baseline ? T.warn : row.changed ? "#c2410c" : T.ok;
                       const statusBg = !row.baseline ? T.warnBg : row.changed ? "#fff7ed" : T.okBg;
-                      const statusLabel = !row.baseline ? "Sin baseline" : row.changed ? "Nueva versión" : "Misma versión";
+                      const statusLabel = !row.baseline ? "Sin estado guardado" : row.changed ? "Nueva versión" : "Misma versión";
                       return (
                         <div key={row.reg} className="baseline-version-row" style={{ padding:"12px 18px", borderTop:`1px solid ${T.border}` }}>
                           <div>
@@ -1106,7 +1106,7 @@ export default function UneceApp() {
                             <div style={{ fontSize:10, color:T.dim, marginTop:2 }}>{row.title}</div>
                           </div>
                           <div>
-                            <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Baseline</div>
+                            <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Estado guardado</div>
                             <div style={{ fontSize:11.5, color:row.baseline ? T.body : T.dim, lineHeight:1.35 }}>
                               {row.baseline?.title ?? "Pendiente de guardar"}
                             </div>
