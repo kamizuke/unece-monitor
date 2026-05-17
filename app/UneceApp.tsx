@@ -230,11 +230,13 @@ function versionPartsFromText(text: string): string[] {
 }
 
 function scopeVersionLabel(evidence: string[]): string | null {
-  for (const item of evidence) {
-    const parts = versionPartsFromText(item);
-    if (parts.length > 0) return parts.join(" · ");
-  }
+  const versionEvidence = scopeVersionEvidence(evidence);
+  if (versionEvidence) return versionPartsFromText(versionEvidence).join(" · ");
   return evidence.length > 0 ? "Referencia en archivo de alcance" : null;
+}
+
+function scopeVersionEvidence(evidence: string[]): string | null {
+  return evidence.find(item => versionPartsFromText(item).length > 0) || null;
 }
 
 function versionLabel(v: BaselineEntry | null | undefined): string {
@@ -252,6 +254,8 @@ function displayVersionLabel(v: BaselineEntry | null | undefined, evidence: stri
 
 function displayVersionTitle(v: BaselineEntry | null | undefined, evidence: string[], reg: number): string {
   if (!isMissingMonitorVersion(v)) return v.title;
+  const versionEvidence = scopeVersionEvidence(evidence);
+  if (versionEvidence) return versionEvidence;
   if (evidence.length > 0) return evidence[0];
   return `No se ha encontrado versión para ${regId(reg)} en el monitor ni en el archivo de alcance.`;
 }
