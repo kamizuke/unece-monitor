@@ -1,8 +1,8 @@
 {
   "status": "success",
-  "started_at": "2026-05-16T12:11:44",
-  "finished_at": "2026-05-16T12:11:49",
-  "last_success": "2026-05-16T12:11:49",
+  "started_at": "2026-05-17T11:06:39",
+  "finished_at": "2026-05-17T11:06:44",
+  "last_success": "2026-05-17T11:06:44",
   "source_url": "https://unece.org/transport/vehicle-regulations-wp29/standards/addenda-1958-agreement-regulations-0-20",
   "regulations": [
     17,
@@ -13,5 +13,5 @@
   "documents_found": 0,
   "new_changes": 0,
   "change_ids": [],
-  "state_last_check": "2026-05-16T12:11:49"
+  "state_last_check": "2026-05-17T11:06:44"
 }
