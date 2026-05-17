@@ -204,20 +204,56 @@ function versionHash(v: { hash?: string; title: string; url?: string }): string 
   return v.hash || `${v.title}|${v.url ?? ""}`;
 }
 
+function isMissingMonitorVersion(v: BaselineEntry | null | undefined): v is null | undefined {
+  return !v || v.title.startsWith("Sin publicación registrada");
+}
+
+function versionPartsFromText(text: string): string[] {
+  const patterns = [
+    /\bRev(?:ision|isión)?\.?\s*\d+(?:\s*\([^)]+\))?/gi,
+    /\b\d{1,2}\s*(?:series|serie)\b/gi,
+    /\b(?:Amendment|Enmienda)\s*\d+/gi,
+    /\b(?:Supplement|Suplemento)\s*\d+/gi,
+    /\b(?:Corrigendum|Corrección)\s*\d+/gi,
+    /\b(?:Addendum|Adenda)\s*\d+/gi,
+  ];
+
+  const parts: string[] = [];
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    for (const match of text.matchAll(pattern)) {
+      parts.push(match[0].trim());
+    }
+  }
+
+  return [...new Set(parts)];
+}
+
+function scopeVersionLabel(evidence: string[]): string | null {
+  for (const item of evidence) {
+    const parts = versionPartsFromText(item);
+    if (parts.length > 0) return parts.join(" · ");
+  }
+  return evidence.length > 0 ? "Referencia en archivo de alcance" : null;
+}
+
 function versionLabel(v: BaselineEntry | null | undefined): string {
-  if (!v || v.title.startsWith("Sin publicación registrada")) return "Sin versión detectada";
+  if (isMissingMonitorVersion(v)) return "Sin versión detectada";
 
-  const parts = [
-    v.title.match(/\bRev(?:ision)?\.?\s*\d+(?:\s*\([^)]+\))?/i)?.[0],
-    v.title.match(/\b\d{1,2}\s*series\b/i)?.[0],
-    v.title.match(/\bAmendment\s*\d+/i)?.[0],
-    v.title.match(/\bSupplement\s*\d+/i)?.[0],
-    v.title.match(/\bCorrigendum\s*\d+/i)?.[0],
-    v.title.match(/\bAddendum\s*\d+/i)?.[0],
-  ].filter(Boolean);
-
+  const parts = versionPartsFromText(v.title);
   if (parts.length > 0) return [...new Set(parts)].join(" · ");
   return v.docType || "Documento detectado";
+}
+
+function displayVersionLabel(v: BaselineEntry | null | undefined, evidence: string[]): string {
+  if (!isMissingMonitorVersion(v)) return versionLabel(v);
+  return scopeVersionLabel(evidence) || "Sin versión detectada";
+}
+
+function displayVersionTitle(v: BaselineEntry | null | undefined, evidence: string[], reg: number): string {
+  if (!isMissingMonitorVersion(v)) return v.title;
+  if (evidence.length > 0) return evidence[0];
+  return `No se ha encontrado versión para ${regId(reg)} en el monitor ni en el archivo de alcance.`;
 }
 
 function scopeEvidenceForReg(scope: AccreditationScope | null, reg: number): string[] {
@@ -1149,19 +1185,19 @@ export default function UneceApp() {
                           </div>
                           <div>
                             <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Estado guardado</div>
-                            <div style={{ fontFamily:T.mono, fontSize:10.5, color:row.baseline ? T.blueDeep : T.dim, fontWeight:700, marginBottom:4 }}>
-                              {versionLabel(row.baseline)}
+                            <div style={{ fontFamily:T.mono, fontSize:10.5, color:displayVersionLabel(row.baseline, row.scopeEvidence) === "Sin versión detectada" ? T.dim : T.blueDeep, fontWeight:700, marginBottom:4 }}>
+                              {displayVersionLabel(row.baseline, row.scopeEvidence)}
                             </div>
-                            <div style={{ fontSize:11.5, color:row.baseline ? T.body : T.dim, lineHeight:1.35 }}>
-                              {row.baseline?.title ?? "Pendiente de guardar"}
+                            <div style={{ fontSize:11.5, color:row.baseline || row.scopeEvidence.length > 0 ? T.body : T.dim, lineHeight:1.35 }}>
+                              {displayVersionTitle(row.baseline, row.scopeEvidence, row.reg)}
                             </div>
                           </div>
                           <div>
                             <div style={{ fontSize:10, color:T.muted, textTransform:"uppercase" as const, letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Detectado en revisión</div>
-                            <div style={{ fontFamily:T.mono, fontSize:10.5, color:T.blueDeep, fontWeight:700, marginBottom:4 }}>
-                              {versionLabel(row.current)}
+                            <div style={{ fontFamily:T.mono, fontSize:10.5, color:displayVersionLabel(row.current, row.scopeEvidence) === "Sin versión detectada" ? T.dim : T.blueDeep, fontWeight:700, marginBottom:4 }}>
+                              {displayVersionLabel(row.current, row.scopeEvidence)}
                             </div>
-                            <div style={{ fontSize:11.5, color:T.body, lineHeight:1.35 }}>{row.current.title}</div>
+                            <div style={{ fontSize:11.5, color:T.body, lineHeight:1.35 }}>{displayVersionTitle(row.current, row.scopeEvidence, row.reg)}</div>
                             <div style={{ fontSize:10, color:T.dim, marginTop:3 }}>
                               {new Date(row.current.capturedAt).toLocaleDateString("es-ES", { day:"2-digit", month:"short", year:"numeric", timeZone:"Europe/Madrid" })}
                             </div>
