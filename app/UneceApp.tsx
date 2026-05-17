@@ -1095,9 +1095,9 @@ export default function UneceApp() {
                 <div style={{ background:"#f0fdf4", border:"1.5px solid #86efac", borderRadius:8, padding:"14px 18px", display:"flex", gap:14, alignItems:"flex-start", animation:"fadeUp .3s ease" }}>
                   <span style={{ fontSize:22, lineHeight:1 }}>📍</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:700, fontSize:13, color:"#166534", marginBottom:3 }}>Estado desde la última revisión guardado</div>
+                    <div style={{ fontWeight:700, fontSize:13, color:"#166534", marginBottom:3 }}>Estado inicial guardado</div>
                     <div style={{ fontSize:12, color:"#15803d", lineHeight:1.5 }}>
-                      Esta primera revisión captura el estado actual de los reglamentos seleccionados. No se esperan cambios detectados todavía — a partir de ahora el monitor comparará cada nueva revisión con el estado desde la última revisión y alertará cuando aparezcan modificaciones.
+                      Esta primera revisión captura el estado actual de los reglamentos seleccionados. No se esperan cambios detectados todavía — a partir de ahora el monitor detectará novedades en cada revisión y alertará cuando aparezcan modificaciones.
                     </div>
                   </div>
                   <button onClick={() => setShowBaselineBanner(false)} style={{ background:"none", border:"none", cursor:"pointer", color:"#16a34a", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }} title="Cerrar">✕</button>
@@ -1109,18 +1109,18 @@ export default function UneceApp() {
                 <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", gap:12, alignItems:"center", flexWrap:"wrap" as const }}>
                   <div>
                     <h2 style={{ fontFamily:T.sans, fontSize:12, fontWeight:700, color:T.muted, letterSpacing:"0.1em", textTransform:"uppercase" as const, margin:"0 0 4px" }}>
-                      Estado desde la última revisión
+                      Versiones detectadas en la revisión
                     </h2>
                     <div style={{ fontSize:12, color:T.body, lineHeight:1.45 }}>
                       {baselineSnapshot
-                        ? <>Estado guardado el {new Date(baselineSnapshot.createdAt).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })}. Cada revisión compara la versión actual contra ese estado.</>
-                        : "Guarda el estado actual para que cada revisión muestre si la versión detectada sigue siendo la misma."}
+                        ? <>Referencia visual guardada el {new Date(baselineSnapshot.createdAt).toLocaleString("es-ES", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", timeZone:"Europe/Madrid" })}. El monitor detecta novedades en cada revisión; esta tabla muestra las versiones detectadas para poder compararlas con el archivo de alcance.</>
+                        : "Guarda una referencia visual para poder comparar las versiones detectadas por el monitor con las que figuran en el archivo de alcance."}
                     </div>
                   </div>
                   <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" as const }}>
                     {baselineSnapshot && (
                       <span style={{ fontFamily:T.mono, fontSize:11, fontWeight:700, color:baselineChangedCount > 0 ? "#c2410c" : T.ok, background:baselineChangedCount > 0 ? "#fff7ed" : T.okBg, border:`1px solid ${baselineChangedCount > 0 ? "#fdba74" : "#bbf7d0"}`, borderRadius:4, padding:"5px 9px" }}>
-                        {baselineChangedCount > 0 ? `${baselineChangedCount} con nueva versión` : "Todo igual que la última revisión"}
+                        {baselineChangedCount > 0 ? `${baselineChangedCount} con nueva versión` : "Sin nueva versión detectada"}
                       </span>
                     )}
                     <button
